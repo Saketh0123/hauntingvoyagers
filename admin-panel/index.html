@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Travel Agency</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        
+        .hidden { display: none !important; }
+        
+        /* Sidebar */
+        .sidebar {
+            width: 260px;
+            background: linear-gradient(180deg, #1e3a8a 0%, #1e40af 100%);
+            height: 100vh;
+            position: fixed;
+            left: 0;
+            top: 0;
+            color: white;
+            padding: 30px 0;
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+        
+        .sidebar-header {
+            padding: 0 25px 25px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .sidebar-header h2 {
+            font-size: 22px;
+            font-weight: 700;
+        }
+        
+        .sidebar-nav {
+            padding: 25px 0;
+        }
+        
+        .nav-item {
+            padding: 14px 25px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 15px;
+        }
+        
+        .nav-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .nav-item.active {
+            background: linear-gradient(90deg, #7c3aed 0%, #a855f7 100%);
+            border-left: 4px solid #ffffff;
+        }
+        
+        .nav-icon {
+            font-size: 18px;
+        }
+        
+        /* Mobile Sidebar */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            
+            .sidebar.open {
+                transform: translateX(0);
+            }
+            
+            .sidebar-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 999;
+                display: none;
+            }
+            
+            .sidebar-overlay.active {
+                display: block;
+            }
+        }
+        
+        /* Main Content */
+        .main-content {
+            margin-left: 260px;
+            min-height: 100vh;
+            background: #f3f4f6;
+            padding: 30px;
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                margin-left: 0;
+                padding: 20px;
+            }
+        }
+        
+        .header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .hamburger {
+            display: none;
+            flex-direction: column;
+            gap: 4px;
+            cursor: pointer;
+            padding: 8px;
+        }
+        
+        .hamburger span {
+            width: 25px;
+            height: 3px;
+            background: #1e3a8a;
+            border-radius: 2px;
+        }
+        
+        @media (max-width: 768px) {
+            .hamburger {
+                display: flex;
+            }
+        }
+        
+        .btn-primary {
+            background: linear-gradient(90deg, #7c3aed 0%, #a855f7 100%);
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: transform 0.2s;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+        }
+        
+        @media (max-width: 768px) {
+            .btn-primary {
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+        }
+        
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+            display: inline-block;
+            text-align: center;
+        }
+        
+        .btn-secondary:hover {
+            background: #4b5563;
+            transform: translateY(-2px);
+        }
+        
+        @media (max-width: 768px) {
+            .btn-primary {
+                padding: 10px 16px;
+                font-size: 14px;
+            }
+        }
+        
+        /* Table */
+        .table-wrapper {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow-x: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 900px;
+        }
+        
+        @media (max-width: 768px) {
+            table {
+                min-width: 800px;
+            }
+        }
+        
+        th, td {
+            padding: 16px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        th {
+            background: #f9fafb;
+            font-weight: 700;
+            color: #374151;
+            text-transform: uppercase;
+            font-size: 12px;
+            letter-spacing: 0.5px;
+        }
+        
+        td {
+            color: #4b5563;
+            font-size: 14px;
+        }
+        
+        tr:hover {
+            background: #f9fafb;
+        }
+        
+        /* Badges */
+        .badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-block;
+        }
+        
+        .badge-indian {
+            background: #dcfce7;
+            color: #166534;
+        }
+        
+        .badge-international {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        /* Buttons */
+        .btn-edit {
+            background: #3b82f6;
+            color: white;
+            padding: 6px 14px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        
+        .btn-edit:hover {
+            background: #2563eb;
+        }
+        
+        .btn-delete {
+            background: #ef4444;
+            color: white;
+            padding: 6px 14px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        
+        .btn-delete:hover {
+            background: #dc2626;
+        }
+        
+        /* Modal */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        
+        .modal.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 25px rgba(0,0,0,0.15);
+        }
+        
+        @media (max-width: 768px) {
+            .modal-content {
+                width: 95%;
+                max-height: 95vh;
+                border-radius: 8px;
+            }
+        }
+        
+        .modal-header {
+            padding: 24px 30px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-header h3 {
+            font-size: 20px;
+            font-weight: 700;
+            color: #111827;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 28px;
+            color: #9ca3af;
+            cursor: pointer;
+            line-height: 1;
+        }
+        
+        .modal-body {
+            padding: 30px;
+        }
+        
+        @media (max-width: 768px) {
+            .modal-header {
+                padding: 18px 20px;
+            }
+            
+            .modal-header h3 {
+                font-size: 18px;
+            }
+            
+            .modal-body {
+                padding: 20px;
+            }
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            color: #374151;
+            font-size: 14px;
+        }
+        
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #7c3aed;
+            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+        }
+        
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        
+        .form-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+        }
+        
+        @media (max-width: 768px) {
+            .form-actions {
+                flex-direction: column-reverse;
+            }
+            
+            .form-actions button {
+                width: 100%;
+            }
+        }
+        
+        .btn-secondary {
+            background: #e5e7eb;
+            color: #374151;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        
+        .btn-secondary:hover {
+            background: #d1d5db;
+        }
+        
+        /* Login Screen */
+        .login-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);
+        }
+        
+        .login-box {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            width: 90%;
+            max-width: 400px;
+        }
+        
+        @media (max-width: 768px) {
+            .login-box {
+                padding: 30px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-container">
+        <div class="login-box">
+            <h2 class="text-2xl font-bold mb-6 text-center">Admin Login</h2>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="adminUsername" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="adminPassword" required autocomplete="current-password">
+                </div>
+                <div id="loginError" class="hidden text-red-500 text-sm mb-4"></div>
+                <button type="submit" class="btn-primary w-full">Login</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Admin Dashboard -->
+    <div id="adminDashboard" class="hidden">
+        <!-- Sidebar Overlay for Mobile -->
+        <div id="sidebarOverlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
+        
+        <!-- Sidebar -->
+        <div id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <h2>🌍 Travel Admin</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-item active" onclick="showView('tours')">
+                    <span class="nav-icon">📋</span>
+                    <span>Tours</span>
+                </div>
+                <div class="nav-item" onclick="showView('home')">
+                    <span class="nav-icon">🏠</span>
+                    <span>Home Settings</span>
+                </div>
+                <div class="nav-item" onclick="showView('dates')">
+                    <span class="nav-icon">📅</span>
+                    <span>Available Dates</span>
+                </div>
+                <div class="nav-item" onclick="showView('pricing')">
+                    <span class="nav-icon">💰</span>
+                    <span>Pricing</span>
+                </div>
+                <div class="nav-item" onclick="showView('duration')">
+                    <span class="nav-icon">⏱️</span>
+                    <span>Duration</span>
+                </div>
+            </nav>
+            <div style="position: absolute; bottom: 20px; left: 0; right: 0; padding: 0 25px;">
+                <button onclick="logout()" class="w-full py-2 bg-red-500 text-white rounded-lg hover:bg-red-600">
+                    Logout
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Header -->
+            <div class="header">
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <div class="hamburger" onclick="toggleSidebar()">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                    <h1 id="viewTitle" class="text-2xl font-bold text-gray-800">Tours Management</h1>
+                </div>
+                <button id="addTourBtn" onclick="openAddModal()" class="btn-primary">+ Add New Tour</button>
+            </div>
+
+            <!-- Home Settings View -->
+            <div id="homeView" class="view-content hidden">
+                <div class="space-y-6">
+                    <!-- Company Information -->
+                    <div class="bg-white rounded-lg p-6 shadow">
+                        <h3 class="text-xl font-bold mb-4 text-gray-800">Company Information</h3>
+                        <div class="space-y-4">
+                            <div class="form-group">
+                                <label>Company Name</label>
+                                <input type="text" id="companyName" placeholder="Enter company name" class="w-full p-3 border rounded-lg">
+                            </div>
+                            <div class="form-group">
+                                <label>Logo Image</label>
+                                <div class="space-y-3">
+                                    <div class="flex gap-3">
+                                        <input type="text" id="logoUrl" placeholder="Enter logo image URL or upload file" class="flex-1 p-3 border rounded-lg">
+                                        <label class="btn-secondary cursor-pointer">
+                                            <input type="file" id="logoFile" accept="image/*" onchange="handleLogoUpload(event)" class="hidden">
+                                            Upload File
+                                        </label>
+                                    </div>
+                                    <div id="logoPreview" class="hidden">
+                                        <img id="logoPreviewImg" src="" alt="Logo Preview" class="max-h-24 border rounded">
+                                    </div>
+                                </div>
+                                <small class="text-gray-500">Enter a URL or upload an image from your computer</small>
+                            </div>
+                            <button onclick="saveCompanyInfo()" class="btn-primary">Save Company Info</button>
+                        </div>
+                    </div>
+
+                    <!-- Hero Images Slider -->
+                    <div class="bg-white rounded-lg p-6 shadow">
+                        <h3 class="text-xl font-bold mb-4 text-gray-800">Hero Images Slider</h3>
+                        <div class="space-y-4">
+                            <div id="heroImagesContainer" class="space-y-3">
+                                <!-- Hero images will be listed here -->
+                            </div>
+                            <div class="space-y-3">
+                                <div class="flex gap-3">
+                                    <input type="text" id="newHeroImageUrl" placeholder="Enter hero image URL or upload file" class="flex-1 p-3 border rounded-lg">
+                                    <label class="btn-secondary cursor-pointer">
+                                        <input type="file" id="heroImageFile" accept="image/*" onchange="handleHeroImageUpload(event)" class="hidden">
+                                        Upload File
+                                    </label>
+                                </div>
+                                <div id="heroImagePreview" class="hidden">
+                                    <img id="heroImagePreviewImg" src="" alt="Hero Preview" class="max-h-32 border rounded">
+                                </div>
+                                <button onclick="addHeroImage()" class="btn-primary w-full">Add Image</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Hero Content -->
+                    <div class="bg-white rounded-lg p-6 shadow">
+                        <h3 class="text-xl font-bold mb-4 text-gray-800">Hero Content</h3>
+                        <div class="space-y-4">
+                            <div class="form-group">
+                                <label>Main Heading</label>
+                                <input type="text" id="heroMainHeading" placeholder="Discover Your Next Adventure" class="w-full p-3 border rounded-lg">
+                                <small class="text-gray-600">The main hero title that appears prominently</small>
+                            </div>
+                            <div class="form-group">
+                                <label>Description</label>
+                                <textarea id="heroDescription" placeholder="Explore breathtaking destinations across India and around the world. Let us craft your perfect journey." class="w-full p-3 border rounded-lg" rows="3"></textarea>
+                                <small class="text-gray-600">Brief description below the main heading</small>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="form-group">
+                                    <label>Primary Button Text</label>
+                                    <input type="text" id="heroPrimaryButton" placeholder="Explore All Trips" class="w-full p-3 border rounded-lg">
+                                </div>
+                                <div class="form-group">
+                                    <label>Secondary Button Text</label>
+                                    <input type="text" id="heroSecondaryButton" placeholder="Indian Trips" class="w-full p-3 border rounded-lg">
+                                </div>
+                            </div>
+                            <button onclick="saveHeroContent()" class="btn-primary">Save Hero Content</button>
+                        </div>
+                    </div>
+
+                    <!-- Social Media Links -->
+                    <div class="bg-white rounded-lg p-6 shadow">
+                        <h3 class="text-xl font-bold mb-4 text-gray-800">Social Media Links</h3>
+                        <div class="space-y-4">
+                            <div class="form-group">
+                                <label>Facebook URL</label>
+                                <input type="text" id="facebookUrl" placeholder="Enter Facebook profile/page URL" class="w-full p-3 border rounded-lg">
+                            </div>
+                            <div class="form-group">
+                                <label>Instagram URL</label>
+                                <input type="text" id="instagramUrl" placeholder="Enter Instagram profile URL" class="w-full p-3 border rounded-lg">
+                            </div>
+                            <div class="form-group">
+                                <label>WhatsApp Number</label>
+                                <input type="text" id="whatsappNumber" placeholder="Enter WhatsApp number (e.g., 919502606607)" class="w-full p-3 border rounded-lg">
+                            </div>
+                            <button onclick="saveSocialMedia()" class="btn-primary">Save Social Media</button>
+                        </div>
+                    </div>
+
+                    <!-- Footer Information -->
+                    <div class="bg-white rounded-lg p-6 shadow">
+                        <h3 class="text-xl font-bold mb-4 text-gray-800">Footer Information</h3>
+                        <div class="space-y-4">
+                            <div class="form-group">
+                                <label>Email Address</label>
+                                <input type="email" id="footerEmail" placeholder="Enter email address" class="w-full p-3 border rounded-lg">
+                            </div>
+                            <div class="form-group">
+                                <label>Contact Number</label>
+                                <input type="text" id="footerPhone" placeholder="Enter contact number" class="w-full p-3 border rounded-lg">
+                            </div>
+                            <div class="form-group">
+                                <label>Copyright Text</label>
+                                <input type="text" id="copyrightText" placeholder="© 2025 Travel Agency. All rights reserved." class="w-full p-3 border rounded-lg">
+                            </div>
+                            <div class="form-group">
+                                <label>Developer Credit Text</label>
+                                <input type="text" id="developerCredit" placeholder="crafted by J.Saketh Reddy" class="w-full p-3 border rounded-lg">
+                            </div>
+                            <div class="form-group">
+                                <label>Developer Link URL (Optional)</label>
+                                <input type="url" id="developerLink" placeholder="https://www.instagram.com/always_saketh_0123/" class="w-full p-3 border rounded-lg">
+                            </div>
+                            <button onclick="saveFooterInfo()" class="btn-primary">Save Footer Info</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tours View -->
+            <div id="toursView" class="view-content">
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Tour Title</th>
+                                <th>Location</th>
+                                <th>Category</th>
+                                <th>Duration</th>
+                                <th>Price</th>
+                                <th>Available Dates</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="toursTableBody">
+                            <tr>
+                                <td colspan="7" class="text-center py-8 text-gray-500">Loading tours...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Dates Management View -->
+            <div id="datesView" class="view-content hidden">
+                <div class="bg-white rounded-lg p-6 shadow">
+                    <h3 class="text-lg font-bold mb-4">Manage Available Dates for All Tours</h3>
+                    <div id="datesManagementContent">
+                        <p class="text-gray-500">Loading...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pricing View -->
+            <div id="pricingView" class="view-content hidden">
+                <div id="pricingContent">
+                    <p class="text-gray-500">Loading...</p>
+                </div>
+            </div>
+
+            <!-- Duration View -->
+            <div id="durationView" class="view-content hidden">
+                <div id="durationContent">
+                    <p class="text-gray-500">Loading...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tour Modal -->
+    <div id="tourModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Add New Tour</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="tourForm">
+                    <input type="hidden" id="tourId">
+                    <input type="hidden" id="existingSlug">
+                    
+                    <!-- Basic Info -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div class="form-group">
+                            <label>Tour Title *</label>
+                            <input type="text" id="title" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Category *</label>
+                            <select id="category" required>
+                                <option value="indian">Indian</option>
+                                <option value="international">International</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div class="form-group">
+                            <label>Location *</label>
+                            <input type="text" id="location" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Country *</label>
+                            <input type="text" id="country" required>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
+                        <div class="form-group">
+                            <label>Duration *</label>
+                            <input type="text" id="duration" placeholder="e.g., 5 Days" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Price (INR) *</label>
+                            <input type="number" id="price" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Group Size</label>
+                            <input type="text" id="groupSize" placeholder="e.g., 2-8 people">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Description *</label>
+                        <textarea id="description" required></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Hero Image</label>
+                        <div class="space-y-2">
+                            <input type="file" id="tourHeroImageFile" accept="image/*" class="w-full px-4 py-2 border rounded-lg">
+                            <div class="text-sm text-gray-500 text-center">OR</div>
+                            <input type="url" id="heroImageUrl" placeholder="https://example.com/image.jpg" class="w-full px-4 py-2 border rounded-lg">
+                            <div id="tourHeroImagePreview" class="hidden mt-2">
+                                <img src="" alt="Preview" class="w-full h-48 object-cover rounded-lg">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Gallery Images -->
+                    <div class="form-group">
+                        <label>Gallery Images</label>
+                        <div class="space-y-2">
+                            <input type="file" id="galleryImagesFile" accept="image/*" multiple class="w-full px-4 py-2 border rounded-lg">
+                            <div class="text-sm text-gray-500">Select multiple images (Ctrl/Cmd + Click)</div>
+                            <div id="galleryImagesInputs" class="space-y-2 mt-3"></div>
+                            <div class="flex gap-2">
+                                <button type="button" onclick="addGalleryUrl()" class="mt-2 px-3 py-1 bg-gray-200 rounded text-sm">+ Add Image URL</button>
+                                <label class="mt-2 px-3 py-1 bg-purple-500 text-white rounded text-sm cursor-pointer hover:bg-purple-600">
+                                    <input type="file" id="additionalGalleryFile" accept="image/*" multiple class="hidden">
+                                    + Choose File
+                                </label>
+                            </div>
+                            <div id="galleryPreview" class="grid grid-cols-3 gap-2 mt-3"></div>
+                        </div>
+                    </div>
+
+                    <!-- Highlights -->
+                    <div class="form-group">
+                        <label>Highlights</label>
+                        <div id="highlightsInputs" class="space-y-2"></div>
+                        <button type="button" onclick="addHighlight()" class="mt-2 px-3 py-1 bg-gray-200 rounded text-sm">+ Add Highlight</button>
+                    </div>
+
+                    <!-- Itinerary -->
+                    <div class="form-group">
+                        <label>Itinerary</label>
+                        <div id="itineraryInputs" class="space-y-3"></div>
+                        <button type="button" onclick="addItineraryDay()" class="mt-2 px-3 py-1 bg-gray-200 rounded text-sm">+ Add Day</button>
+                    </div>
+
+                    <!-- Inclusions -->
+                    <div class="form-group">
+                        <label>Inclusions</label>
+                        <div id="inclusionsInputs" class="space-y-2"></div>
+                        <button type="button" onclick="addInclusion()" class="mt-2 px-3 py-1 bg-gray-200 rounded text-sm">+ Add Inclusion</button>
+                    </div>
+
+                    <!-- Exclusions -->
+                    <div class="form-group">
+                        <label>Exclusions</label>
+                        <div id="exclusionsInputs" class="space-y-2"></div>
+                        <button type="button" onclick="addExclusion()" class="mt-2 px-3 py-1 bg-gray-200 rounded text-sm">+ Add Exclusion</button>
+                    </div>
+
+                    <!-- Available Dates -->
+                    <div class="form-group">
+                        <label>Available Dates</label>
+                        <div id="datesInputs" class="space-y-3"></div>
+                        <button type="button" onclick="addDateSlot()" class="mt-2 px-3 py-1 bg-gray-200 rounded text-sm">+ Add Date Slot</button>
+                    </div>
+
+                    <!-- Options -->
+                    <div style="display: flex; gap: 30px; margin: 20px 0;">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="featured">
+                            <span>Add in Home</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="active" checked>
+                            <span>Active</span>
+                        </label>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="form-actions">
+                        <button type="button" onclick="closeModal()" class="btn-secondary">Cancel</button>
+                        <button type="submit" class="btn-primary">Save Tour</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+</html>

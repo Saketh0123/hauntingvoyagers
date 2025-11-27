@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tours Admin - Pawan Krishna Tours & Travels</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+        .sidebar {
+            background: linear-gradient(180deg, #1e3a8a 0%, #1e40af 100%);
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background-color: white;
+            border-radius: 12px;
+            width: 95%;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+        .table-wrapper {
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th {
+            background: #f3f4f6;
+            font-weight: 600;
+            text-align: left;
+            padding: 12px 16px;
+            border-bottom: 2px solid #e5e7eb;
+            white-space: nowrap;
+        }
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        tr:hover {
+            background: #f9fafb;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .badge-indian {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .badge-international {
+            background: #dbeafe;
+            color: #1e3a8a;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #9333ea 0%, #db2777 100%);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(147, 51, 234, 0.4);
+        }
+        .btn-edit {
+            background: #3b82f6;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: none;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .btn-delete {
+            background: #ef4444;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: none;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .nav-item {
+            color: #e0e7ff;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 8px;
+        }
+        .nav-item.active {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+        .nav-item:hover {
+            background: rgba(255,255,255,0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Login Screen -->
+    <div id="loginScreen" class="min-h-screen flex items-center justify-center" style="background: linear-gradient(to right, #f97316, #ec4899);">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl w-96">
+            <h1 class="text-3xl font-bold text-center mb-6" style="background: linear-gradient(to right, #f97316, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                Admin Login
+            </h1>
+            <p class="text-center text-gray-600 mb-6">Pawan Krishna Tours & Travels</p>
+            <form id="loginForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <input type="password" id="adminPassword" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent" required>
+                </div>
+                <button type="submit" class="w-full py-2 rounded-lg font-semibold transition" style="background: linear-gradient(to right, #f97316, #ec4899); color: white;">
+                    Login
+                </button>
+                <p id="loginError" class="text-red-500 text-sm text-center hidden"></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Admin Dashboard -->
+    <div id="adminDashboard" class="hidden">
+        <div class="flex h-screen">
+            <!-- Sidebar -->
+            <div class="sidebar w-64 flex-shrink-0">
+                <div class="p-6">
+                    <h1 class="text-white text-2xl font-bold mb-2">Tours Admin</h1>
+                    <p class="text-blue-200 text-sm">Management Panel</p>
+                </div>
+                <nav class="px-4">
+                    <div class="nav-item active">
+                        <svg class="inline-block w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"></path>
+                        </svg>
+                        Tours
+                    </div>
+                </nav>
+            </div>
+
+            <!-- Main Content -->
+            <div class="flex-1 flex flex-col overflow-hidden">
+                <!-- Header -->
+                <header class="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+                    <h2 class="text-2xl font-bold text-gray-800">Tours Management</h2>
+                    <button onclick="logout()" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">
+                        Logout
+                    </button>
+                </header>
+
+                <!-- Content Area -->
+                <main class="flex-1 overflow-y-auto bg-gray-50 p-6">
+                    <div class="bg-white rounded-lg shadow">
+                        <!-- Table Header -->
+                        <div class="p-6 border-b border-gray-200 flex justify-between items-center">
+                            <h3 class="text-lg font-semibold text-gray-800">All Tours</h3>
+                            <button onclick="openAddModal()" class="btn-primary">
+                                + Add New Tour
+                            </button>
+                        </div>
+
+                        <!-- Table -->
+                        <div class="table-wrapper">
+                            <table id="toursTable">
+                                <thead>
+                                    <tr>
+                                        <th>Title</th>
+                                        <th>Location</th>
+                                        <th>Type</th>
+                                        <th>Duration</th>
+                                        <th>Price</th>
+                                        <th>Available Dates</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="toursTableBody">
+                                    <tr>
+                                        <td colspan="7" class="text-center py-8 text-gray-500">Loading tours...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Tour Modal -->
+    <div id="tourModal" class="modal">
+        <div class="modal-content">
+            <div class="p-6 border-b border-gray-200 flex justify-between items-center">
+                <h3 id="modalTitle" class="text-xl font-bold text-gray-800">Add New Tour</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+            </div>
+            
+            <form id="tourForm" class="p-6 space-y-6">
+                <input type="hidden" id="tourId">
+                
+                <!-- Basic Info -->
+                <div>
+                    <label class="block text-sm font-medium mb-1">Tour Title *</label>
+                    <input type="text" id="title" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                </div>
+
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Category *</label>
+                        <select id="category" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                            <option value="">Select category</option>
+                            <option value="indian">Indian</option>
+                            <option value="international">International</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Location *</label>
+                        <input type="text" id="location" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                    </div>
+                </div>
+
+                <div class="grid md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Country *</label>
+                        <input type="text" id="country" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Duration *</label>
+                        <input type="text" id="duration" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500" placeholder="5 Days, 4 Nights">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Difficulty</label>
+                        <select id="difficulty" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                            <option value="Easy">Easy</option>
+                            <option value="Moderate">Moderate</option>
+                            <option value="Challenging">Challenging</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Price (INR) *</label>
+                        <input type="number" id="price" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Group Size</label>
+                        <input type="text" id="groupSize" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500" placeholder="2-8 people" value="2-8 people">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-1">Description *</label>
+                    <textarea id="description" required rows="4" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"></textarea>
+                </div>
+
+                <!-- Hero Image -->
+                <div class="border-t pt-4">
+                    <h4 class="font-semibold mb-3">Hero Image</h4>
+                    <input type="url" id="heroImageUrl" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500" placeholder="Image URL">
+                </div>
+
+                <!-- Highlights -->
+                <div class="border-t pt-4">
+                    <h4 class="font-semibold mb-3">Tour Highlights</h4>
+                    <div id="highlightsInputs" class="space-y-2">
+                        <input type="text" placeholder="Enter highlight" class="highlight-input w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                    </div>
+                    <button type="button" onclick="addHighlight()" class="mt-2 px-3 py-1 bg-blue-500 text-white rounded text-sm">+ Add Highlight</button>
+                </div>
+
+                <!-- Itinerary -->
+                <div class="border-t pt-4">
+                    <h4 class="font-semibold mb-3">Day-by-Day Itinerary</h4>
+                    <div id="itineraryInputs" class="space-y-3">
+                        <div class="itinerary-day border rounded-lg p-3">
+                            <div class="grid grid-cols-2 gap-2">
+                                <input type="number" placeholder="Day" class="day-number px-3 py-2 border rounded" value="1">
+                                <input type="text" placeholder="Title" class="day-title px-3 py-2 border rounded">
+                            </div>
+                            <textarea placeholder="Description" class="day-description mt-2 w-full px-3 py-2 border rounded" rows="2"></textarea>
+                            <button type="button" onclick="removeItineraryDay(this)" class="mt-1 px-2 py-1 bg-red-500 text-white rounded text-xs">Remove</button>
+                        </div>
+                    </div>
+                    <button type="button" onclick="addItineraryDay()" class="mt-2 px-3 py-1 bg-blue-500 text-white rounded text-sm">+ Add Day</button>
+                </div>
+
+                <!-- Inclusions -->
+                <div class="border-t pt-4">
+                    <h4 class="font-semibold mb-3">What's Included</h4>
+                    <div id="inclusionsInputs" class="space-y-2">
+                        <input type="text" placeholder="Enter inclusion" class="inclusion-input w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                    </div>
+                    <button type="button" onclick="addInclusion()" class="mt-2 px-3 py-1 bg-blue-500 text-white rounded text-sm">+ Add Inclusion</button>
+                </div>
+
+                <!-- Exclusions -->
+                <div class="border-t pt-4">
+                    <h4 class="font-semibold mb-3">What's Not Included</h4>
+                    <div id="exclusionsInputs" class="space-y-2">
+                        <input type="text" placeholder="Enter exclusion" class="exclusion-input w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                    </div>
+                    <button type="button" onclick="addExclusion()" class="mt-2 px-3 py-1 bg-blue-500 text-white rounded text-sm">+ Add Exclusion</button>
+                </div>
+
+                <!-- Available Dates -->
+                <div class="border-t pt-4">
+                    <h4 class="font-semibold mb-3">Available Dates</h4>
+                    <div id="datesInputs" class="space-y-3">
+                        <div class="date-slot border rounded-lg p-3">
+                            <div class="grid grid-cols-2 gap-3">
+                                <input type="date" class="start-date px-3 py-2 border rounded" placeholder="Start Date">
+                                <input type="date" class="end-date px-3 py-2 border rounded" placeholder="End Date">
+                            </div>
+                            <button type="button" onclick="removeDateSlot(this)" class="mt-2 px-2 py-1 bg-red-500 text-white rounded text-xs">Remove</button>
+                        </div>
+                    </div>
+                    <button type="button" onclick="addDateSlot()" class="mt-2 px-3 py-1 bg-blue-500 text-white rounded text-sm">+ Add Date Slot</button>
+                </div>
+
+                <!-- Options -->
+                <div class="border-t pt-4">
+                    <div class="flex gap-6">
+                        <label class="flex items-center">
+                            <input type="checkbox" id="featured" class="mr-2 w-4 h-4 text-purple-500 focus:ring-purple-500 rounded">
+                            <span class="text-sm font-medium">Featured on Homepage</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" id="active" checked class="mr-2 w-4 h-4 text-purple-500 focus:ring-purple-500 rounded">
+                            <span class="text-sm font-medium">Active</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Submit -->
+                <div class="border-t pt-4 flex gap-3">
+                    <button type="submit" class="btn-primary">Save Tour</button>
+                    <button type="button" onclick="closeModal()" class="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-400">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="admin-new.js"></script>
+</body>
+</html>

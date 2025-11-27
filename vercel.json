@@ -1,0 +1,8 @@
+{
+  "version": 2,
+  "cleanUrls": true,
+  "routes": [
+    { "src": "^/$", "dest": "/home.html" },
+    { "src": "/api/(.*)", "dest": "/api/index.js" }
+  ]
+}
