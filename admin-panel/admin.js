@@ -1,4 +1,5 @@
-const API_URL = 'http://localhost:3000/api';
+// Use centralized API base injected by api-base.js, fallback to localhost
+const API_URL = (typeof window !== 'undefined' && window.API_BASE) ? window.API_BASE : 'http://localhost:3000/api';
 const ADMIN_USERNAME = 'admin';
 const ADMIN_PASSWORD = 'admin123';
 const CLOUDINARY_CLOUD_NAME = 'dfw1w02tb';
