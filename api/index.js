@@ -1,5 +1,6 @@
-// Export Express app directly for Vercel Node serverless runtime
-// Vercel will invoke this function for any path rewritten to /api/index.js
+// Wrap Express app with serverless-http so Vercel treats this file as a function.
+// This avoids platform-level NOT_FOUND when rewriting all /api/* paths here.
+const serverless = require('serverless-http');
 const app = require('./server');
 
-module.exports = app;
+module.exports = serverless(app);
