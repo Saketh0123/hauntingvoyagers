@@ -58,7 +58,7 @@
             align-items: center;
             justify-content: center;
             z-index: 9999;
-            transition: opacity 0.5s ease;
+            transition: opacity 0.3s ease;
           }
           #page-loader.loaded {
             opacity: 0;
@@ -70,7 +70,7 @@
           }
           body.content-loaded > *:not(#page-loader) {
             opacity: 1;
-            transition: opacity 0.6s ease 0.3s;
+            transition: opacity 0.3s ease;
           }
           /* Hide the original hardcoded hero to prevent flash */
           section.relative.overflow-hidden.mt-16:not([data-dynamic]) { 
@@ -4234,7 +4234,7 @@ h1, h2, h3, h4, h5, h6 {
           const loader = document.getElementById('page-loader');
           if (loader) {
             loader.classList.add('loaded');
-            setTimeout(() => loader.remove(), 600);
+            setTimeout(() => loader.remove(), 300);
           }
           
           // Initialize guest count from sessionStorage (set by trip.html/destinations pages)
