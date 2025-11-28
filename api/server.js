@@ -217,20 +217,9 @@ app.get('/api/settings', async (req, res) => {
 // Update site settings
 app.put('/api/settings', async (req, res) => {
   try {
-    let settings = await Settings.findOne({ type: 'site_settings' });
-    
-    if (!settings) {
-      settings = new Settings({ type: 'site_settings', ...req.body });
-    } else {
-      settings.set(req.body);
-      if (req.body.footer) settings.markModified('footer');
-      if (req.body.company) settings.markModified('company');
-      if (req.body.heroContent) settings.markModified('heroContent');
-      if (req.body.socialMedia) settings.markModified('socialMedia');
-      if (req.body.heroImages) settings.markModified('heroImages');
-    }
-    
-    await settings.save();
+    const update = { $set: req.body, $setOnInsert: { type: 'site_settings' } };
+    const options = { new: true, upsert: true, runValidators: false }; // allow partials
+    const settings = await Settings.findOneAndUpdate({ type: 'site_settings' }, update, options);
     res.json(settings);
   } catch (error) {
     res.status(400).json({ error: error.message });
