@@ -10,7 +10,27 @@ const { uploadImage, uploadMultipleImages } = require('./cloudinary');
 const app = express();
 
 // Middleware
-app.use(cors());
+const allowedOrigins = [
+  process.env.ADMIN_ORIGIN,
+  process.env.MAIN_ORIGIN,
+  'https://hauntingvoyagers-kijp.vercel.app',
+  'https://hauntingvoyagers-5mgf.vercel.app'
+].filter(Boolean);
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true); // allow same-origin and curl
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(null, true); // default to allow; tighten if needed
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+};
+
+app.use(cors(corsOptions));
+app.options('/api/*', cors(corsOptions));
 app.use(express.json({ limit: '50mb' })); // Increase limit for base64 images
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static('.')); // Serve static HTML files
