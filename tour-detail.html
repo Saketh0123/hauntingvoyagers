@@ -4214,23 +4214,30 @@ h1, h2, h3, h4, h5, h6 {
             };
             preload.onerror = function () {
               if (loadingTextEl) loadingTextEl.textContent = 'Image unavailable';
-              if (heroLoading) heroLoading.classList.add('bg-black/50');
+              if (heroLoading) {
+                heroLoading.style.opacity = '0';
+                setTimeout(() => heroLoading.remove(), 300);
+              }
               console.warn('Hero image failed to load');
             };
             preload.src = tour.images.hero;
+          } else {
+            // No hero image, remove loading overlay anyway
+            if (heroLoading) {
+              heroLoading.style.opacity = '0';
+              setTimeout(() => heroLoading.remove(), 300);
+            }
           }
           
           console.log('✅ All tour content updated successfully!');
           
-          // Mark page as loaded and hide loader
-          setTimeout(() => {
-            document.body.classList.add('content-loaded');
-            const loader = document.getElementById('page-loader');
-            if (loader) {
-              loader.classList.add('loaded');
-              setTimeout(() => loader.remove(), 600);
-            }
-          }, 300);
+          // Mark page as loaded and hide loader immediately
+          document.body.classList.add('content-loaded');
+          const loader = document.getElementById('page-loader');
+          if (loader) {
+            loader.classList.add('loaded');
+            setTimeout(() => loader.remove(), 600);
+          }
           
           // Initialize guest count from sessionStorage (set by trip.html/destinations pages)
           const savedGuests = sessionStorage.getItem('trip_guests');
