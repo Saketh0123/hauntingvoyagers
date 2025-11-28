@@ -3948,11 +3948,17 @@ h1, h2, h3, h4, h5, h6 {
           return;
         }
         
-        // Fetch tour data
+        // Fetch tour data with fallback
         fetch(`${API_URL}/tours/${slug}`)
-          .then(response => {
-            if (!response.ok) throw new Error('Tour not found');
-            return response.json();
+          .then(async (response) => {
+            if (response.ok) return response.json();
+            // Fallback: fetch all tours and find by slug client-side
+            const listRes = await fetch(`${API_URL}/tours?status=active`);
+            if (!listRes.ok) throw new Error('Tour not found');
+            const tours = await listRes.json();
+            const match = Array.isArray(tours) ? tours.find(t => String(t.slug) === slug) : null;
+            if (!match) throw new Error('Tour not found');
+            return match;
           })
           .then(tour => {
             console.log('Tour loaded:', tour);
