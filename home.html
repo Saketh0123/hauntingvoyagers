@@ -4113,12 +4113,34 @@ h1, h2, h3, h4, h5, h6 {
         </script>
 
         <!-- Hero Section -->
+        <style>
+          /* Hero loading state rules */
+          section#home.hero-initializing { background: #ffffff; }
+          section#home.hero-initializing #hero-slider-container { opacity: 0; }
+          section#home.hero-loaded #hero-slider-container { opacity: 1; }
+          section#home.hero-initializing #hero-content-wrapper,
+          section#home.hero-initializing #hero-prev,
+          section#home.hero-initializing #hero-next,
+          section#home.hero-initializing #hero-scroll-indicator { opacity: 0 !important; visibility: hidden !important; pointer-events: none; }
+          section#home.hero-loaded #hero-content-wrapper,
+          section#home.hero-loaded #hero-scroll-indicator { opacity: 1 !important; visibility: visible !important; pointer-events: auto; }
+          section#home #hero-cta { display: none !important; }
+          section#home.hero-loaded #hero-cta { display: flex !important; }
+          /* Spinner */
+          .hero-loading-spinner { display: none; width: 64px; height: 64px; border-radius: 50%; border: 6px solid #e5e7eb; border-top-color: var(--brand-color, #db2777); animation: spin 1s linear infinite; }
+          section#home.hero-initializing .hero-loading-spinner { display: block; }
+          section#home.hero-loaded .hero-loading-spinner { display: none; }
+        </style>
         <section id="home" class="relative h-screen flex items-center justify-center overflow-hidden mt-16 hero-initializing">
             <div class="absolute inset-0 z-0" id="hero-slider-container">
                 <!-- Layer 1 - Active image with immediate fallback -->
                 <div class="absolute inset-0" id="hero-layer-1" style="background-size: cover; background-repeat: no-repeat; background-position: center center; background-image: var(--hero-initial-image, none); opacity: 1; transition: opacity 0.3s ease-in-out;"></div>
                 <!-- Layer 2 - Next image (hidden initially) -->
                 <div class="absolute inset-0" id="hero-layer-2" style="background-size: cover; background-repeat: no-repeat; background-position: center center; background-image: var(--hero-initial-image, none); opacity: 0; transition: opacity 0.3s ease-in-out;"></div>
+            </div>
+            <!-- Centered spinner while initializing -->
+            <div class="absolute inset-0 z-20 flex items-center justify-center">
+              <div class="hero-loading-spinner" aria-hidden="true"></div>
             </div>
             
             <!-- Left Arrow -->
@@ -4135,7 +4157,7 @@ h1, h2, h3, h4, h5, h6 {
                 <h2 id="hero-company-name" class="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-6 bg-gradient-to-r from-yellow-300 to-orange-400 bg-clip-text text-transparent overflow-visible pb-2 transition-opacity duration-300"></h2>
                 <h1 id="hero-main-heading" class="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight overflow-visible transition-opacity duration-300"></h1>
                 <p id="hero-description" class="text-base sm:text-lg md:text-xl text-white/90 mb-8 max-w-2xl mx-auto transition-opacity duration-300"></p>
-                <div class="flex flex-wrap gap-4 justify-center">
+                <div id="hero-cta" class="flex flex-wrap gap-4 justify-center">
                     <a href="/trips" data-discover="true">
                         <button id="hero-primary-button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-primary/90 h-10 bg-gradient-to-r from-orange-500 to-pink-600 hover:from-orange-600 hover:to-pink-700 text-white px-8 py-6 text-lg rounded-full shadow-2xl" data-testid="explore-trips-btn">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search mr-2 h-5 w-5" aria-hidden="true"><path d="m21 21-4.34-4.34"></path><circle cx="11" cy="11" r="8"></circle></svg>
@@ -4472,40 +4494,39 @@ h1, h2, h3, h4, h5, h6 {
       currentIndex = 0;
       stopAutoSlide();
       resetLayers();
-      // Set layer1 to first image (visible)
-      setLayerImage(layer1, images[0]);
-      // Set layer2 to second image (or first if only one image), ready for next transition
-      setLayerImage(layer2, images.length > 1 ? images[1] : images[0]);
-      try {
-        document.documentElement.style.setProperty('--hero-initial-image', 'url("' + images[0] + '")');
-      } catch (err) {
-        console.warn('[Slider] Unable to set initial image variable', err);
-      }
-      revealHero();
-      toggleButtons(images.length > 1);
-      bindButtons();
-      startAutoSlide();
-      if (persist) persistImages(images);
+      // Preload first image and reveal only after it finishes loading
+      preload(images[0], () => {
+        setLayerImage(layer1, images[0]);
+        setLayerImage(layer2, images.length > 1 ? images[1] : images[0]);
+        try {
+          document.documentElement.style.setProperty('--hero-initial-image', 'url("' + images[0] + '")');
+        } catch (err) {
+          console.warn('[Slider] Unable to set initial image variable', err);
+        }
+        revealHero();
+        toggleButtons(images.length > 1);
+        bindButtons();
+        startAutoSlide();
+        if (persist) persistImages(images);
+      });
     };
 
     const loadFromCache = () => {
       try {
         const raw = readFromStorage(localStore, sessionStore, cacheKey) || readFromStorage(sessionStore, null, sessionCacheKey);
         if (!raw) {
-          // No cache - reveal hero anyway so structure is visible
-          revealHero();
+          // No cache - wait for live hydrate; keep spinner
           return;
         }
         const cached = JSON.parse(raw);
         if (Array.isArray(cached) && cached.length) {
           applyImages(cached, false);
         } else {
-          // Invalid cache - reveal anyway
-          revealHero();
+          // Invalid cache - wait for live hydrate
         }
       } catch (err) {
         console.warn('[Slider] Cache read failed', err);
-        revealHero();
+        // Keep waiting for live hydrate
       }
     };
 
@@ -4971,11 +4992,7 @@ h1, h2, h3, h4, h5, h6 {
       }).filter(Boolean);
     };
 
-    const ensurePageVisible = () => {
-      if (!heroSection) return;
-      heroSection.classList.remove('hero-initializing');
-      heroSection.classList.add('hero-loaded');
-    };
+    const ensurePageVisible = () => { /* no-op: avoid forcing early reveal */ };
 
     // Immediately load cached hero content before API fetch
     (() => {
@@ -5042,7 +5059,6 @@ h1, h2, h3, h4, h5, h6 {
         });
         if (!response.ok) {
           console.warn('[Settings] Non-OK response', response.status);
-          ensurePageVisible();
           heroSlider.clearCache();
           return;
         }
@@ -5050,7 +5066,6 @@ h1, h2, h3, h4, h5, h6 {
         console.log('[Settings] Loaded', settings);
       } catch (error) {
         console.error('[Settings] Error loading admin settings:', error);
-        ensurePageVisible();
         heroSlider.clearCache();
         return;
       } finally {
@@ -5059,7 +5074,6 @@ h1, h2, h3, h4, h5, h6 {
     }
 
     if (!settings) {
-      ensurePageVisible();
       heroSlider.clearCache();
       return;
     }
@@ -5151,11 +5165,11 @@ h1, h2, h3, h4, h5, h6 {
         heroSlider.hydrate(heroImages, { persist: true });
         console.log('[Slider] Hydrated with', heroImages.length, 'images');
       } else {
-        ensurePageVisible();
+        // keep waiting for valid images
       }
     } else {
       heroSlider.clearCache();
-      ensurePageVisible();
+      // keep spinner
     }
 
     // Update social media links
@@ -5216,7 +5230,7 @@ h1, h2, h3, h4, h5, h6 {
       }
     }
 
-    ensurePageVisible();
+    // do not reveal here; heroSlider will reveal after image load
   }
   
   // Load settings when page loads
