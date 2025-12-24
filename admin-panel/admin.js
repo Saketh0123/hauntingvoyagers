@@ -241,6 +241,17 @@ document.addEventListener('DOMContentLoaded', function() {
     if (additionalGalleryFile) {
         additionalGalleryFile.addEventListener('change', handleAdditionalGalleryUpload);
     }
+    
+    // Add date validation listener for dynamically created date inputs
+    document.addEventListener('change', function(e) {
+        if (e.target.classList.contains('start-date') || e.target.type === 'date') {
+            const today = new Date().toISOString().split('T')[0];
+            if (e.target.value && e.target.value < today) {
+                alert('Cannot select past dates. Please choose today or a future date.');
+                e.target.value = '';
+            }
+        }
+    });
 });
 
 // Login
@@ -317,6 +328,7 @@ function showView(viewName) {
         loadTours();
     } else if (viewName === 'dates') {
         document.getElementById('datesView').classList.remove('hidden');
+        loadDatesView();
         loadDatesManagement();
     } else if (viewName === 'pricing') {
         document.getElementById('pricingView').classList.remove('hidden');
@@ -357,6 +369,16 @@ async function loadTours() {
     try {
         const response = await fetch(`${API_URL}/tours?status=all`);
         allTours = await response.json();
+        
+        // Sort tours: Indian category first, then International (case-insensitive)
+        allTours.sort((a, b) => {
+            const aCat = (a.category || '').toLowerCase();
+            const bCat = (b.category || '').toLowerCase();
+            if (aCat === 'indian' && bCat !== 'indian') return -1;
+            if (aCat !== 'indian' && bCat === 'indian') return 1;
+            return 0;
+        });
+        
         renderToursTable(allTours);
     } catch (error) {
         console.error('Error loading tours:', error);
@@ -549,6 +571,7 @@ function populateForm(tour) {
     // Populate dates
     const datesContainer = document.getElementById('datesInputs');
     datesContainer.innerHTML = '';
+    const today = new Date().toISOString().split('T')[0];
     if (tour.availableDates && tour.availableDates.length > 0) {
         tour.availableDates.forEach(dateSlot => {
             const slotDiv = document.createElement('div');
@@ -556,7 +579,7 @@ function populateForm(tour) {
             slotDiv.innerHTML = `
                 <div class="flex items-center gap-3">
                     <label class="text-sm font-medium text-gray-700 w-20">Date:</label>
-                    <input type="date" class="start-date flex-1 px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" value="${dateSlot.startDate ? dateSlot.startDate.split('T')[0] : ''}" required>
+                    <input type="date" class="start-date flex-1 px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" value="${dateSlot.startDate ? dateSlot.startDate.split('T')[0] : ''}" min="${today}" required>
                     <button type="button" onclick="removeDateSlot(this)" class="px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded text-sm transition">Remove</button>
                 </div>
             `;
@@ -668,6 +691,7 @@ function collectExclusions() {
 
 function collectDates() {
     const slots = document.querySelectorAll('.date-slot');
+    const today = new Date().toISOString().split('T')[0];
     return Array.from(slots).map(slot => {
         const startDate = slot.querySelector('.start-date').value;
         // Use same date for both start and end to maintain compatibility
@@ -676,7 +700,7 @@ function collectDates() {
             endDate: startDate,
             spotsAvailable: 20
         };
-    }).filter(slot => slot.startDate); // Only include filled dates
+    }).filter(slot => slot.startDate && slot.startDate >= today); // Only include filled dates that are today or future
 }
 
 // Dynamic field functions
@@ -731,9 +755,10 @@ function addDateSlot() {
     const container = document.getElementById('datesInputs');
     const slotDiv = document.createElement('div');
     slotDiv.className = 'date-slot border rounded-lg p-3 bg-gray-50';
+    const today = new Date().toISOString().split('T')[0];
     slotDiv.innerHTML = `
         <div class="flex items-center gap-3">
-            <input type="date" class="start-date flex-1 px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" required>
+            <input type="date" class="start-date flex-1 px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" min="${today}" required>
             <button type="button" onclick="removeDateSlot(this)" class="px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded text-sm transition">Remove</button>
         </div>
     `;
@@ -787,6 +812,26 @@ function removeExistingGalleryImage(index) {
 }
 
 // Dates Management View
+// Remove tour hero image preview
+function removeTourHeroImage() {
+    const preview = document.getElementById('tourHeroImagePreview');
+    const previewImg = preview.querySelector('img');
+    const fileInput = document.getElementById('tourHeroImageFile');
+    const urlInput = document.getElementById('heroImageUrl');
+    
+    previewImg.src = '';
+    preview.classList.add('hidden');
+    fileInput.value = '';
+    urlInput.value = '';
+    heroImageUrl = null;
+}
+
+// Load dates view - placeholder function to prevent errors
+function loadDatesView() {
+    // This function is called when switching to dates view
+    // The actual dates are loaded by loadDatesManagement()
+}
+
 async function loadDatesManagement() {
     const container = document.getElementById('datesManagementContent');
     if (allTours.length === 0) await loadTours();
@@ -814,7 +859,19 @@ function renderTourDates(tour) {
         return '<p class="text-sm text-gray-500">No dates available</p>';
     }
     
-    return tour.availableDates.map((date, index) => {
+    // Filter out past dates
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const futureDates = tour.availableDates.filter(date => {
+        const dateObj = date.startDate ? new Date(date.startDate) : null;
+        return dateObj && dateObj >= today;
+    });
+    
+    if (futureDates.length === 0) {
+        return '<p class="text-sm text-gray-500">No upcoming dates available</p>';
+    }
+    
+    return futureDates.map((date, index) => {
         const dateObj = date.startDate ? new Date(date.startDate) : null;
         const formattedDate = dateObj ? 
             `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}/${dateObj.getFullYear()}` : 
@@ -834,6 +891,8 @@ async function addNewDateToTour(tourId) {
     // Create a modal/dialog with date picker
     const dateInput = document.createElement('input');
     dateInput.type = 'date';
+    const today = new Date().toISOString().split('T')[0];
+    dateInput.min = today;
     dateInput.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10000; padding: 10px; border: 2px solid #7c3aed; border-radius: 8px; font-size: 16px;';
     
     const backdrop = document.createElement('div');

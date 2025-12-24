@@ -4788,9 +4788,19 @@ h1, h2, h3, h4, h5, h6 {
         const response = await fetch(`${API_URL}/tours?status=active`);
         const tours = await response.json();
         
-        // Filter featured tours or show first 6
-        const featured = tours.filter(t => t.featured).slice(0, 6);
-        const toursToShow = featured.length > 0 ? featured : tours.slice(0, 6);
+        // Filter featured tours or use all active tours
+        const featured = tours.filter(t => t.featured);
+        const toursPool = featured.length > 0 ? featured : tours;
+        
+        // Separate by category (case-insensitive)
+        const indianTours = toursPool.filter(t => t.category && t.category.toLowerCase() === 'indian');
+        const internationalTours = toursPool.filter(t => t.category && t.category.toLowerCase() === 'international');
+        
+        // Show ALL Indian tours first, then ALL International tours (no limit)
+        const toursToShow = [
+          ...indianTours,
+          ...internationalTours
+        ];
         
         // Clear existing cards
         grid.innerHTML = '';

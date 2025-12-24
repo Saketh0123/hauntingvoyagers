@@ -4456,17 +4456,22 @@ h1, h2, h3, h4, h5, h6 {
           const response = await fetch(`${API_URL}/tours?status=active`);
           const tours = await response.json();
           
+          // Separate by category and sort: ALL Indian first, then ALL International
+          const indianTours = tours.filter(t => t.category && t.category.toLowerCase() === 'indian');
+          const internationalTours = tours.filter(t => t.category && t.category.toLowerCase() === 'international');
+          const sortedTours = [...indianTours, ...internationalTours];
+          
           // Update count (scope strictly to filters section to avoid touching nav dropdown)
           const countSpan = document.querySelector('[data-testid="filters-section"] .text-gray-700.font-medium');
           if (countSpan) {
-            countSpan.textContent = `${tours.length} trips found`;
+            countSpan.textContent = `${sortedTours.length} trips found`;
           }
           
           // Clear existing cards
           grid.innerHTML = '';
           
           // Render dynamic cards
-          tours.forEach(tour => {
+          sortedTours.forEach(tour => {
             const card = createTourCard(tour);
             grid.appendChild(card);
           });
