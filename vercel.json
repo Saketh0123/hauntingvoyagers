@@ -11,5 +11,8 @@
         { "key": "Access-Control-Max-Age", "value": "600" }
       ]
     }
+  ],
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/api/[...path].js" }
   ]
 }
