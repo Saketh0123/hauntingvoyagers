@@ -1,10 +1,14 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const path = require('path');
 require('dotenv').config();
 
 const Tour = require('./tourModel');
 const Settings = require('./settingsModel');
+const Travell = require('./travellModel');
+const HeroImage = require('./heroImageModel');
+const Booking = require('./bookingModel');
 const { uploadImage, uploadMultipleImages } = require('./cloudinary');
 
 const app = express();
@@ -43,7 +47,16 @@ app.use((req, res, next) => {
 });
 app.use(express.json({ limit: '50mb' })); // Increase limit for base64 images
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
-app.use(express.static('.')); // Serve static HTML files
+// Serve static files from the project root, regardless of where node is started
+const STATIC_ROOT = path.join(__dirname, '..');
+app.use(express.static(STATIC_ROOT));
+// Explicit routes for home to avoid path/cwd issues
+app.get('/', (req, res) => {
+  res.sendFile(path.join(STATIC_ROOT, 'home.html'));
+});
+app.get('/home.html', (req, res) => {
+  res.sendFile(path.join(STATIC_ROOT, 'home.html'));
+});
 
 // MongoDB connection
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/travel-agency';
@@ -156,6 +169,114 @@ app.post('/api/upload/images', async (req, res) => {
   }
 });
 
+// ==================== VEHICLE (TRAVELL) ROUTES ====================
+
+// Get all vehicles
+app.get('/api/travells', async (req, res) => {
+  try {
+    const { status } = req.query;
+    const filter = {};
+    if (status && status !== 'all') filter.isActive = status === 'active';
+    const travells = await Travell.find(filter).sort({ displayOrder: 1, createdAt: -1 });
+    res.json(travells);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get one vehicle
+app.get('/api/travells/:id', async (req, res) => {
+  try {
+    const doc = await Travell.findById(req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Vehicle not found' });
+    res.json(doc);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create vehicle
+app.post('/api/travells', async (req, res) => {
+  try {
+    const body = { ...req.body };
+    if (!body.slug && body.name) {
+      body.slug = body.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Date.now();
+    }
+    const doc = new Travell(body);
+    await doc.save();
+    res.status(201).json(doc);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Update vehicle
+app.put('/api/travells/:id', async (req, res) => {
+  try {
+    const doc = await Travell.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: false, strict: false });
+    if (!doc) return res.status(404).json({ error: 'Vehicle not found' });
+    res.json(doc);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Delete vehicle
+app.delete('/api/travells/:id', async (req, res) => {
+  try {
+    const doc = await Travell.findByIdAndDelete(req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Vehicle not found' });
+    res.json({ message: 'Vehicle deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== HERO IMAGES ROUTES (RENTALS) ====================
+
+// Get hero images
+app.get('/api/hero-images', async (req, res) => {
+  try {
+    const images = await HeroImage.find({ isActive: true }).sort({ displayOrder: 1, createdAt: -1 });
+    res.json(images);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create hero image
+app.post('/api/hero-images', async (req, res) => {
+  try {
+    const image = new HeroImage(req.body);
+    await image.save();
+    res.status(201).json(image);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Update hero image
+app.put('/api/hero-images/:id', async (req, res) => {
+  try {
+    const image = await HeroImage.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: false, strict: false });
+    if (!image) return res.status(404).json({ error: 'Image not found' });
+    res.json(image);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Delete hero image
+app.delete('/api/hero-images/:id', async (req, res) => {
+  try {
+    const image = await HeroImage.findByIdAndDelete(req.params.id);
+    if (!image) return res.status(404).json({ error: 'Image not found' });
+    res.json({ message: 'Image deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ==================== SETTINGS ROUTES ====================
 
 // Get site settings
@@ -245,6 +366,94 @@ app.put('/api/settings', async (req, res) => {
   } catch (error) {
     console.error('Settings update error:', error);
     res.status(400).json({ error: error.message });
+  }
+});
+
+// ==================== BOOKINGS ROUTES ====================
+
+// Get all bookings
+app.get('/api/bookings', async (req, res) => {
+  try {
+    const bookings = await Booking.find({}).sort({ createdAt: -1 });
+    res.json(bookings);
+  } catch (error) {
+    console.error('Error fetching bookings:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create new booking
+app.post('/api/bookings', async (req, res) => {
+  try {
+    const booking = new Booking({
+      name: req.body.name,
+      phone: req.body.phone,
+      travelDate: req.body.travelDate,
+      vehicleType: req.body.vehicleType,
+      additionalRequirements: req.body.additionalRequirements || ''
+    });
+    await booking.save();
+    res.status(201).json(booking);
+  } catch (error) {
+    console.error('Error creating booking:', error);
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Get booking by ID (supports both Mongo _id and bookingId)
+app.get('/api/bookings/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    let booking = null;
+    if (id.match(/^[a-fA-F0-9]{24}$/)) {
+      booking = await Booking.findById(id);
+    }
+    if (!booking) {
+      booking = await Booking.findOne({ bookingId: id });
+    }
+    if (!booking) return res.status(404).json({ error: 'Booking not found' });
+    res.json(booking);
+  } catch (error) {
+    console.error('Error fetching booking:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update booking (e.g., confirm status)
+app.put('/api/bookings/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    let updated = null;
+    if (id.match(/^[a-fA-F0-9]{24}$/)) {
+      updated = await Booking.findByIdAndUpdate(id, req.body, { new: true });
+    }
+    if (!updated) {
+      updated = await Booking.findOneAndUpdate({ bookingId: id }, req.body, { new: true });
+    }
+    if (!updated) return res.status(404).json({ error: 'Booking not found' });
+    res.json(updated);
+  } catch (error) {
+    console.error('Error updating booking:', error);
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Delete booking
+app.delete('/api/bookings/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    let deleted = null;
+    if (id.match(/^[a-fA-F0-9]{24}$/)) {
+      deleted = await Booking.findByIdAndDelete(id);
+    }
+    if (!deleted) {
+      deleted = await Booking.findOneAndDelete({ bookingId: id });
+    }
+    if (!deleted) return res.status(404).json({ error: 'Booking not found' });
+    res.json({ message: 'Booking deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting booking:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 

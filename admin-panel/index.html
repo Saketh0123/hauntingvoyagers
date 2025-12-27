@@ -246,6 +246,21 @@
             color: #1e40af;
         }
         
+        .badge-pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .badge-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .badge-danger {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
         /* Buttons */
         .btn-edit {
             background: #3b82f6;
@@ -482,6 +497,14 @@
                     <span class="nav-icon">📋</span>
                     <span>Tours</span>
                 </div>
+                <div class="nav-item" onclick="showView('travells')">
+                    <span class="nav-icon">🚌</span>
+                    <span>Travells</span>
+                </div>
+                <div class="nav-item" onclick="showView('bookings')">
+                    <span class="nav-icon">📝</span>
+                    <span>Bookings</span>
+                </div>
                 <div class="nav-item" onclick="showView('home')">
                     <span class="nav-icon">🏠</span>
                     <span>Home Settings</span>
@@ -677,6 +700,75 @@
                 </div>
             </div>
 
+            <!-- Travells View -->
+            <div id="travellsView" class="view-content hidden">
+                <div class="header" style="margin-bottom: 20px;">
+                    <h2 class="text-xl font-bold">Vehicle Rentals Management</h2>
+                    <button id="addVehicleBtn" class="btn-primary">+ Add Vehicle</button>
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Vehicle Name</th>
+                                <th>Image</th>
+                                <th>Seats</th>
+                                <th>Price/KM</th>
+                                <th>Features</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="travellsTableBody">
+                            <tr>
+                                <td colspan="7" class="text-center py-8 text-gray-500">Loading vehicles...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="bg-white rounded-lg p-6 shadow mt-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-bold">Hero Slider Images</h3>
+                        <button id="addHeroImageBtn" class="btn-primary">+ Add Hero Image</button>
+                    </div>
+                    <div id="heroImagesGrid" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+                </div>
+            </div>
+
+            <!-- Bookings Management View -->
+            <div id="bookingsView" class="view-content hidden">
+                <div style="margin-bottom: 20px;">
+                    <div style="max-width: 400px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #374151;">Search by Booking ID</label>
+                        <input type="text" id="bookingSearchInput" placeholder="Enter Booking ID (e.g., BK1234567890)" 
+                               style="width: 100%; padding: 10px 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px;"
+                               oninput="filterBookings()">
+                    </div>
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Booking ID</th>
+                                <th>Name</th>
+                                <th>Phone</th>
+                                <th>Travel Date</th>
+                                <th>Vehicle Type</th>
+                                <th>Requirements</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bookingsTableBody">
+                            <tr>
+                                <td colspan="8" class="text-center py-8 text-gray-500">Loading bookings...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- Dates Management View -->
             <div id="datesView" class="view-content hidden">
                 <div class="bg-white rounded-lg p-6 shadow">
@@ -843,6 +935,102 @@
                     <div class="form-actions">
                         <button type="button" onclick="closeModal()" class="btn-secondary">Cancel</button>
                         <button type="submit" class="btn-primary">Save Tour</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Travell Modal -->
+    <div id="travellModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="travellModalTitle">Add New Vehicle</h3>
+                <button class="modal-close" onclick="closeTravellModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="travellForm">
+                    <input type="hidden" id="travellId">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="form-group">
+                            <label>Vehicle Name *</label>
+                            <input type="text" id="vehicleName" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Seats *</label>
+                            <input type="number" id="vehicleSeats" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Price per KM *</label>
+                            <input type="number" id="vehiclePrice" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Display Order</label>
+                            <input type="number" id="vehicleOrder" value="0">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Vehicle Image</label>
+                        <div class="space-y-2">
+                            <input type="file" id="vehicleImageFile" accept="image/*" class="w-full px-4 py-2 border rounded-lg">
+                            <div id="vehicleUploadStatus" class="text-xs text-gray-500"></div>
+                            <div class="text-sm text-gray-500 text-center">OR</div>
+                            <input type="url" id="vehicleImageUrl" placeholder="https://example.com/image.jpg" class="w-full px-4 py-2 border rounded-lg">
+                            <div id="vehicleImagePreview" class="mt-2"></div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Features</label>
+                        <div id="featuresInputs" class="space-y-2"></div>
+                        <button type="button" onclick="addFeature()" class="mt-2 px-3 py-1 bg-gray-200 rounded text-sm">+ Add Feature</button>
+                    </div>
+
+                    <div class="flex items-center gap-4">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="vehicleActive" checked>
+                            <span>Active</span>
+                        </label>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" onclick="closeTravellModal()" class="btn-secondary">Cancel</button>
+                        <button type="submit" class="btn-primary">Save Vehicle</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hero Image Modal -->
+    <div id="heroImageModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add Hero Image</h3>
+                <button class="modal-close" onclick="closeHeroImageModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="heroImageForm">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="form-group">
+                            <label>Image File</label>
+                            <input type="file" id="rentalsHeroImageFile" accept="image/*" class="w-full px-4 py-2 border rounded-lg">
+                            <div id="rentalsHeroUploadStatus" class="text-xs text-gray-500"></div>
+                        </div>
+                        <div class="form-group">
+                            <label>Image URL</label>
+                            <input type="url" id="rentalsHeroImageUrl" placeholder="https://example.com/image.jpg" class="w-full px-4 py-2 border rounded-lg">
+                        </div>
+                    </div>
+                    <div id="rentalsHeroImagePreview" class="mt-2"></div>
+                    <div class="form-group">
+                        <label>Display Order</label>
+                        <input type="number" id="rentalsHeroImageOrder" value="0">
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" onclick="closeHeroImageModal()" class="btn-secondary">Cancel</button>
+                        <button type="submit" class="btn-primary">Add Image</button>
                     </div>
                 </form>
             </div>

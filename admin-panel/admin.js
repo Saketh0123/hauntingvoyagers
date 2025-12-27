@@ -303,6 +303,8 @@ function showView(viewName) {
     const viewTitles = {
         'home': 'Home Settings',
         'tours': 'Tours Management',
+        'travells': 'Vehicle Rentals Management',
+        'bookings': 'Booking Requests',
         'dates': 'Available Dates Management',
         'pricing': 'Tour Pricing Overview',
         'duration': 'Tour Durations'
@@ -312,13 +314,9 @@ function showView(viewName) {
     
     // Show/hide Add Tour button based on view
     const addTourBtn = document.getElementById('addTourBtn');
-    if (addTourBtn) {
-        if (viewName === 'tours') {
-            addTourBtn.style.display = 'block';
-        } else {
-            addTourBtn.style.display = 'none';
-        }
-    }
+    const addVehicleBtn = document.getElementById('addVehicleBtn');
+    if (addTourBtn) addTourBtn.style.display = viewName === 'tours' ? 'block' : 'none';
+    if (addVehicleBtn) addVehicleBtn.onclick = openTravellModal;
     
     if (viewName === 'home') {
         document.getElementById('homeView').classList.remove('hidden');
@@ -326,6 +324,13 @@ function showView(viewName) {
     } else if (viewName === 'tours') {
         document.getElementById('toursView').classList.remove('hidden');
         loadTours();
+    } else if (viewName === 'travells') {
+        document.getElementById('travellsView').classList.remove('hidden');
+        loadTravells();
+        loadHeroImages();
+    } else if (viewName === 'bookings') {
+        document.getElementById('bookingsView').classList.remove('hidden');
+        loadBookings();
     } else if (viewName === 'dates') {
         document.getElementById('datesView').classList.remove('hidden');
         loadDatesView();
@@ -341,6 +346,597 @@ function showView(viewName) {
     // Close sidebar on mobile after selection
     if (window.innerWidth <= 768) {
         toggleSidebar();
+    }
+}
+
+// ==================== TRAVELLS MANAGEMENT ====================
+
+let currentTravell = null;
+let vehicleImageUrl = '';
+
+function openTravellModal() {
+    currentTravell = null;
+    vehicleImageUrl = '';
+    document.getElementById('travellModalTitle').textContent = 'Add New Vehicle';
+    document.getElementById('travellForm').reset();
+    document.getElementById('travellId').value = '';
+    document.getElementById('featuresInputs').innerHTML = '';
+    document.getElementById('vehicleImagePreview').innerHTML = '';
+    document.getElementById('vehicleActive').checked = true;
+    addFeature();
+    document.getElementById('travellModal').classList.add('active');
+}
+
+function closeTravellModal() {
+    document.getElementById('travellModal').classList.remove('active');
+}
+
+function addFeature() {
+    const container = document.getElementById('featuresInputs');
+    const featureDiv = document.createElement('div');
+    featureDiv.className = 'flex gap-2';
+    featureDiv.innerHTML = `
+        <input type="text" class="feature-input flex-1 px-4 py-2 border rounded-lg" placeholder="e.g., AC with push-back seats">
+        <button type="button" onclick="this.parentElement.remove()" class="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600">Remove</button>
+    `;
+    container.appendChild(featureDiv);
+}
+
+async function handleVehicleImageUpload() {
+    const fileInput = document.getElementById('vehicleImageFile');
+    const preview = document.getElementById('vehicleImagePreview');
+    const statusEl = document.getElementById('vehicleUploadStatus');
+    if (fileInput.files && fileInput.files[0]) {
+        const file = fileInput.files[0];
+        fileInput.disabled = true;
+        
+        // Show placeholder with progress bar
+        preview.innerHTML = `
+            <div class="relative inline-block">
+                <div class="w-32 h-32 flex items-center justify-center text-xs bg-gray-100 rounded border border-dashed border-gray-300">
+                    <span>Uploading...</span>
+                </div>
+                <div class="mt-1 h-2 bg-gray-200 rounded overflow-hidden">
+                    <div id="vehicleUploadBar" class="h-full bg-gradient-to-r from-purple-500 to-fuchsia-500 w-0 transition-all"></div>
+                </div>
+            </div>
+        `;
+        
+        try {
+            const url = await uploadToCloudinaryWithProgress(file, (percent) => {
+                const bar = document.getElementById('vehicleUploadBar');
+                if (bar) bar.style.width = percent + '%';
+            });
+            vehicleImageUrl = url;
+            preview.innerHTML = `
+                <div class="relative inline-block">
+                    <img src="${url}" alt="Preview" class="h-32 rounded">
+                    <button type="button" onclick="removeVehicleImage()" class="absolute top-0 right-0 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center">×</button>
+                </div>
+            `;
+            document.getElementById('vehicleImageUrl').value = '';
+            if (statusEl) { statusEl.textContent = 'Uploaded ✓'; statusEl.className = 'text-xs text-green-600'; }
+            fileInput.disabled = false;
+        } catch (error) {
+            console.error('Vehicle image upload error:', error);
+            preview.innerHTML = `<p class="text-xs text-red-600">Upload failed</p>`;
+            if (statusEl) {
+                statusEl.innerHTML = `
+                    <span class="text-red-600">Upload failed</span>
+                    <button type="button" id="retryVehicleUploadBtn" class="ml-2 px-2 py-1 bg-yellow-500 text-white rounded text-xs hover:bg-yellow-600">Retry</button>
+                `;
+                const retryBtn = document.getElementById('retryVehicleUploadBtn');
+                if (retryBtn) retryBtn.onclick = () => handleVehicleImageUpload();
+            }
+            fileInput.disabled = false;
+        }
+    }
+}
+
+function handleVehicleImageUrl() {
+    const urlInput = document.getElementById('vehicleImageUrl');
+    const preview = document.getElementById('vehicleImagePreview');
+    const statusEl = document.getElementById('vehicleUploadStatus');
+    const url = urlInput.value.trim();
+    if (url) {
+        // Show loading state
+        if (statusEl) { statusEl.textContent = 'Loading preview...'; statusEl.className = 'text-xs text-gray-600'; }
+        preview.innerHTML = `
+            <div class="relative inline-block">
+                <div class="w-32 h-32 flex items-center justify-center text-xs bg-gray-100 rounded border border-dashed border-gray-300">
+                    <span>Loading...</span>
+                </div>
+            </div>
+        `;
+        
+        // Test image load
+        const img = new Image();
+        img.onload = () => {
+            vehicleImageUrl = url;
+            preview.innerHTML = `
+                <div class="relative inline-block">
+                    <img src="${url}" alt="Preview" class="h-32 rounded">
+                    <button type="button" onclick="removeVehicleImage()" class="absolute top-0 right-0 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center">×</button>
+                </div>
+            `;
+            document.getElementById('vehicleImageFile').value = '';
+            if (statusEl) { statusEl.textContent = 'Preview loaded ✓'; statusEl.className = 'text-xs text-green-600'; }
+        };
+        img.onerror = () => {
+            preview.innerHTML = `<p class="text-xs text-red-600">Invalid image URL</p>`;
+            if (statusEl) { statusEl.textContent = 'Invalid URL'; statusEl.className = 'text-xs text-red-600'; }
+        };
+        img.src = url;
+    }
+}
+
+function removeVehicleImage() {
+    vehicleImageUrl = '';
+    document.getElementById('vehicleImagePreview').innerHTML = '';
+    document.getElementById('vehicleImageFile').value = '';
+    document.getElementById('vehicleImageUrl').value = '';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const vehicleImageFile = document.getElementById('vehicleImageFile');
+    const vehicleImageUrlEl = document.getElementById('vehicleImageUrl');
+    if (vehicleImageFile) vehicleImageFile.addEventListener('change', handleVehicleImageUpload);
+    if (vehicleImageUrlEl) vehicleImageUrlEl.addEventListener('blur', handleVehicleImageUrl);
+    const addVehicleBtn = document.getElementById('addVehicleBtn');
+    if (addVehicleBtn) addVehicleBtn.addEventListener('click', openTravellModal);
+    const addHeroImageBtn = document.getElementById('addHeroImageBtn');
+    if (addHeroImageBtn) addHeroImageBtn.addEventListener('click', openHeroImageModal);
+});
+
+async function loadTravells() {
+    try {
+        const response = await fetch(`${API_URL}/travells`);
+        const travells = await response.json();
+        const tbody = document.getElementById('travellsTableBody');
+        if (!travells || travells.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-gray-500">No vehicles found</td></tr>';
+            return;
+        }
+        tbody.innerHTML = travells.map(travell => `
+            <tr>
+                <td>${travell.name}</td>
+                <td><img src="${travell.image}" alt="${travell.name}" class="h-12 w-20 object-cover rounded" /></td>
+                <td>${travell.seats}</td>
+                <td>₹${travell.pricePerKm}/km</td>
+                <td><div class="text-sm">${(travell.features||[]).slice(0,2).map(f=>`<div>• ${f}</div>`).join('')}${(travell.features||[]).length>2?`<div class="text-gray-500">+${travell.features.length-2} more</div>`:''}</div></td>
+                <td><span class="px-2 py-1 rounded text-xs ${travell.isActive? 'bg-green-100 text-green-800':'bg-gray-100 text-gray-800'}">${travell.isActive? 'Active':'Inactive'}</span></td>
+                <td>
+                    <button onclick="editTravell('${travell._id}')" class="btn-edit">Edit</button>
+                    <button onclick="deleteTravell('${travell._id}')" class="btn-delete ml-2">Delete</button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (error) {
+        console.error('Error loading travells:', error);
+        document.getElementById('travellsTableBody').innerHTML = '<tr><td colspan="7" class="text-center py-8 text-red-500">Error loading vehicles</td></tr>';
+    }
+}
+
+async function editTravell(id) {
+    try {
+        const response = await fetch(`${API_URL}/travells/${id}`);
+        const currentTravell = await response.json();
+        document.getElementById('travellModalTitle').textContent = 'Edit Vehicle';
+        document.getElementById('travellId').value = currentTravell._id;
+        document.getElementById('vehicleName').value = currentTravell.name;
+        document.getElementById('vehicleSeats').value = currentTravell.seats;
+        document.getElementById('vehiclePrice').value = currentTravell.pricePerKm;
+        document.getElementById('vehicleOrder').value = currentTravell.displayOrder || 0;
+        document.getElementById('vehicleActive').checked = currentTravell.isActive;
+        vehicleImageUrl = currentTravell.image;
+        document.getElementById('vehicleImagePreview').innerHTML = `
+            <div class="relative inline-block">
+                <img src="${currentTravell.image}" alt="Preview" class="h-32 rounded">
+                <button type="button" onclick="removeVehicleImage()" class="absolute top-0 right-0 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center">×</button>
+            </div>`;
+        const featuresContainer = document.getElementById('featuresInputs');
+        featuresContainer.innerHTML = '';
+        (currentTravell.features||[]).forEach(f => {
+            const div = document.createElement('div');
+            div.className = 'flex gap-2';
+            div.innerHTML = `
+                <input type="text" class="feature-input flex-1 px-4 py-2 border rounded-lg" value="${f}">
+                <button type="button" onclick="this.parentElement.remove()" class="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600">Remove</button>`;
+            featuresContainer.appendChild(div);
+        });
+        document.getElementById('travellModal').classList.add('active');
+    } catch (error) {
+        console.error('Error loading vehicle:', error);
+        alert('Error loading vehicle details');
+    }
+}
+
+async function deleteTravell(id) {
+    if (!confirm('Are you sure you want to delete this vehicle?')) return;
+    try {
+        const response = await fetch(`${API_URL}/travells/${id}`, { method: 'DELETE' });
+        if (response.ok) { alert('Vehicle deleted successfully'); loadTravells(); }
+        else { alert('Error deleting vehicle'); }
+    } catch (error) {
+        console.error('Error deleting vehicle:', error);
+        alert('Error deleting vehicle');
+    }
+}
+
+document.getElementById('travellForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = document.getElementById('vehicleName').value.trim();
+    const seats = parseInt(document.getElementById('vehicleSeats').value);
+    const pricePerKm = parseInt(document.getElementById('vehiclePrice').value);
+    const displayOrder = parseInt(document.getElementById('vehicleOrder').value) || 0;
+    const isActive = document.getElementById('vehicleActive').checked;
+    if (!vehicleImageUrl) { alert('Please upload or provide a vehicle image'); return; }
+    const features = Array.from(document.querySelectorAll('.feature-input')).map(i=>i.value.trim()).filter(Boolean);
+    const data = { name, image: vehicleImageUrl, seats, pricePerKm, features, displayOrder, isActive };
+    try {
+        const id = document.getElementById('travellId').value;
+        const url = id ? `${API_URL}/travells/${id}` : `${API_URL}/travells`;
+        const method = id ? 'PUT' : 'POST';
+        const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+        if (response.ok) { alert('Vehicle saved successfully!'); closeTravellModal(); loadTravells(); }
+        else { const err = await response.json(); alert('Error saving vehicle: ' + (err.error||'Unknown error')); }
+    } catch (error) {
+        console.error('Error saving vehicle:', error); alert('Error saving vehicle');
+    }
+});
+
+// ==================== HERO IMAGES (RENTALS) ====================
+let heroImageUploadUrl = '';
+
+function openHeroImageModal() {
+    heroImageUploadUrl = '';
+    document.getElementById('heroImageForm').reset();
+    const preview = document.getElementById('rentalsHeroImagePreview');
+    if (preview) preview.innerHTML = '';
+    document.getElementById('heroImageModal').classList.add('active');
+}
+function closeHeroImageModal() { document.getElementById('heroImageModal').classList.remove('active'); }
+
+async function handleRentalsHeroImageUpload() {
+    const fileInput = document.getElementById('rentalsHeroImageFile');
+    const preview = document.getElementById('rentalsHeroImagePreview');
+    const statusEl = document.getElementById('rentalsHeroUploadStatus');
+    if (fileInput && fileInput.files && fileInput.files[0]) {
+        const file = fileInput.files[0];
+        fileInput.disabled = true;
+        
+        // Show placeholder with progress bar
+        if (preview) {
+            preview.innerHTML = `
+                <div class="relative inline-block">
+                    <div class="w-32 h-32 flex items-center justify-center text-xs bg-gray-100 rounded border border-dashed border-gray-300">
+                        <span>Uploading...</span>
+                    </div>
+                    <div class="mt-1 h-2 bg-gray-200 rounded overflow-hidden">
+                        <div id="heroUploadBar" class="h-full bg-gradient-to-r from-purple-500 to-fuchsia-500 w-0 transition-all"></div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        try {
+            const url = await uploadToCloudinaryWithProgress(file, (percent) => {
+                const bar = document.getElementById('heroUploadBar');
+                if (bar) bar.style.width = percent + '%';
+            });
+            heroImageUploadUrl = url;
+            if (preview) {
+                preview.innerHTML = `
+                <div class="relative inline-block">
+                    <img src="${url}" alt="Preview" class="h-32 rounded">
+                    <button type="button" onclick="removeRentalsHeroImageUpload()" class="absolute top-0 right-0 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center">×</button>
+                </div>`;
+            }
+            const urlInput = document.getElementById('rentalsHeroImageUrl');
+            if (urlInput) urlInput.value = '';
+            if (statusEl) { statusEl.textContent = 'Uploaded ✓'; statusEl.className = 'text-xs text-green-600'; }
+            fileInput.disabled = false;
+        } catch (error) {
+            console.error('Hero image upload error:', error);
+            if (preview) preview.innerHTML = `<p class="text-xs text-red-600">Upload failed</p>`;
+            if (statusEl) {
+                statusEl.innerHTML = `
+                    <span class="text-red-600">Upload failed</span>
+                    <button type="button" id="retryHeroUploadBtn" class="ml-2 px-2 py-1 bg-yellow-500 text-white rounded text-xs hover:bg-yellow-600">Retry</button>
+                `;
+                const retryBtn = document.getElementById('retryHeroUploadBtn');
+                if (retryBtn) retryBtn.onclick = () => handleRentalsHeroImageUpload();
+            }
+            fileInput.disabled = false;
+        }
+    }
+}
+
+function handleRentalsHeroImageUrlInput() {
+    const urlInput = document.getElementById('rentalsHeroImageUrl');
+    const preview = document.getElementById('rentalsHeroImagePreview');
+    const statusEl = document.getElementById('rentalsHeroUploadStatus');
+    const url = urlInput ? urlInput.value.trim() : '';
+    if (url) {
+        // Show loading state
+        if (statusEl) { statusEl.textContent = 'Loading preview...'; statusEl.className = 'text-xs text-gray-600'; }
+        if (preview) {
+            preview.innerHTML = `
+                <div class="relative inline-block">
+                    <div class="w-32 h-32 flex items-center justify-center text-xs bg-gray-100 rounded border border-dashed border-gray-300">
+                        <span>Loading...</span>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Test image load
+        const img = new Image();
+        img.onload = () => {
+            heroImageUploadUrl = url;
+            if (preview) {
+                preview.innerHTML = `
+                <div class="relative inline-block">
+                    <img src="${url}" alt="Preview" class="h-32 rounded">
+                    <button type="button" onclick="removeRentalsHeroImageUpload()" class="absolute top-0 right-0 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center">×</button>
+                </div>`;
+            }
+            const fileInput = document.getElementById('rentalsHeroImageFile');
+            if (fileInput) fileInput.value = '';
+            if (statusEl) { statusEl.textContent = 'Preview loaded ✓'; statusEl.className = 'text-xs text-green-600'; }
+        };
+        img.onerror = () => {
+            if (preview) preview.innerHTML = `<p class="text-xs text-red-600">Invalid image URL</p>`;
+            if (statusEl) { statusEl.textContent = 'Invalid URL'; statusEl.className = 'text-xs text-red-600'; }
+        };
+        img.src = url;
+    }
+}
+function removeRentalsHeroImageUpload() {
+    heroImageUploadUrl = '';
+    const preview = document.getElementById('rentalsHeroImagePreview');
+    if (preview) preview.innerHTML = '';
+    const fileInput = document.getElementById('rentalsHeroImageFile');
+    const urlInput = document.getElementById('rentalsHeroImageUrl');
+    if (fileInput) fileInput.value = '';
+    if (urlInput) urlInput.value = '';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const rentalsHeroImageFile = document.getElementById('rentalsHeroImageFile');
+    const rentalsHeroImageUrl = document.getElementById('rentalsHeroImageUrl');
+    if (rentalsHeroImageFile) rentalsHeroImageFile.addEventListener('change', handleRentalsHeroImageUpload);
+    if (rentalsHeroImageUrl) rentalsHeroImageUrl.addEventListener('blur', handleRentalsHeroImageUrlInput);
+});
+
+async function loadHeroImages() {
+    try {
+        const response = await fetch(`${API_URL}/hero-images`);
+        const images = await response.json();
+        const grid = document.getElementById('heroImagesGrid');
+        if (!images || images.length === 0) {
+            grid.innerHTML = '<p class="text-gray-500">No hero images added yet.</p>';
+            return;
+        }
+        grid.innerHTML = images.map(image => `
+            <div class="relative bg-white rounded-lg shadow overflow-hidden">
+                <img src="${image.url}" alt="Hero Image" class="w-full h-48 object-cover">
+                <div class="p-3">
+                    <div class="text-sm text-gray-600">Order: ${image.displayOrder}</div>
+                    <div class="mt-2 flex gap-2">
+                        <button onclick="deleteHeroImage('${image._id}')" class="flex-1 px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600">Delete</button>
+                    </div>
+                </div>
+            </div>`).join('');
+    } catch (error) {
+        console.error('Error loading hero images:', error);
+        document.getElementById('heroImagesGrid').innerHTML = '<p class="text-red-500">Error loading hero images</p>';
+    }
+}
+
+document.getElementById('heroImageForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!heroImageUploadUrl) { alert('Please upload or enter an image URL'); return; }
+    const orderEl = document.getElementById('rentalsHeroImageOrder');
+    const displayOrder = parseInt(orderEl ? orderEl.value : '0') || 0;
+    const data = { url: heroImageUploadUrl, publicId: heroImageUploadUrl.split('/').pop().split('.')[0], displayOrder, isActive: true };
+    try {
+        const response = await fetch(`${API_URL}/hero-images`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+        if (response.ok) { alert('Hero image added successfully!'); closeHeroImageModal(); loadHeroImages(); }
+        else { const err = await response.json(); alert('Error saving hero image: ' + (err.error||'Unknown error')); }
+    } catch (error) {
+        console.error('Error saving hero image:', error); alert('Error saving hero image');
+    }
+});
+
+async function deleteHeroImage(id) {
+    if (!confirm('Are you sure you want to delete this hero image?')) return;
+    try {
+        const response = await fetch(`${API_URL}/hero-images/${id}`, { method: 'DELETE' });
+        if (response.ok) { alert('Hero image deleted successfully!'); loadHeroImages(); }
+        else { alert('Delete failed'); }
+    } catch (error) {
+        console.error('Error deleting hero image:', error); alert('Error deleting hero image');
+    }
+}
+
+// ==================== BOOKINGS MANAGEMENT ====================
+
+async function loadBookings() {
+    try {
+        const response = await fetch(`${API_URL}/bookings`);
+        const bookings = await response.json();
+        
+        // Sort by creation date (newest first)
+        bookings.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        
+        // Cache for filtering
+        allBookingsCache = bookings;
+        
+        renderBookingsTable(bookings);
+    } catch (error) {
+        console.error('Error loading bookings:', error);
+        document.getElementById('bookingsTableBody').innerHTML = 
+            '<tr><td colspan="8" class="text-center py-8 text-red-500">Error loading bookings</td></tr>';
+    }
+}
+
+function renderBookingsTable(bookings) {
+    const tbody = document.getElementById('bookingsTableBody');
+    
+    if (bookings.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-gray-500">No bookings found</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = bookings.map(booking => {
+        const statusClass = {
+            'pending': 'badge badge-pending',
+            'confirmed': 'badge badge-success',
+            'cancelled': 'badge badge-danger'
+        }[booking.status] || 'badge';
+        
+        const statusBadge = `<span class="${statusClass}">${booking.status.toUpperCase()}</span>`;
+        
+        const travelDate = new Date(booking.travelDate).toLocaleDateString('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric'
+        });
+        
+        const requirements = booking.additionalRequirements 
+            ? (booking.additionalRequirements.length > 30 
+                ? booking.additionalRequirements.substring(0, 30) + '...' 
+                : booking.additionalRequirements)
+            : '-';
+        
+        return `
+            <tr>
+                <td><strong>${booking.bookingId}</strong></td>
+                <td>${booking.name}</td>
+                <td>${booking.phone}</td>
+                <td>${travelDate}</td>
+                <td>${booking.vehicleType}</td>
+                <td title="${booking.additionalRequirements || ''}">${requirements}</td>
+                <td>${statusBadge}</td>
+                <td>
+                    ${booking.status === 'pending' ? `
+                        <button class="btn-edit" onclick="confirmBooking('${booking.bookingId}', '${booking.phone}', '${booking.name}', '${booking.vehicleType}', '${booking.travelDate}')">
+                            Confirm
+                        </button>
+                    ` : ''}
+                    <button class="btn-delete" onclick="deleteBooking('${booking.bookingId}')">
+                        Delete
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+async function confirmBooking(bookingId, customerPhone, customerName, vehicleType, travelDate) {
+    try {
+        // Update booking status to confirmed
+        const updateResponse = await fetch(`${API_URL}/bookings/${bookingId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'confirmed' })
+        });
+        
+        if (!updateResponse.ok) {
+            throw new Error('Failed to update booking status');
+        }
+        
+        // Get company info from settings
+        const settingsResponse = await fetch(`${API_URL}/settings`);
+        const settings = await settingsResponse.json();
+        const companyName = (settings.company && settings.company.name) ? settings.company.name : 'Travel Agency';
+
+        // Attempt to fetch vehicle rate/seats
+        let vehicleInfo = null;
+        try {
+            const travResp = await fetch(`${API_URL}/travells?status=all`);
+            const travells = await travResp.json();
+            vehicleInfo = travells.find(v => (v.name || '').toLowerCase() === (vehicleType || '').toLowerCase());
+        } catch (e) {
+            console.warn('Could not load vehicles for invoice details:', e);
+        }
+
+        // Clean phone number (remove non-digits)
+        const cleanPhone = customerPhone.replace(/\D/g, '');
+        
+        if (!cleanPhone) {
+            alert('Invalid phone number');
+            return;
+        }
+
+        // Format date
+        const dateStr = new Date(travelDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
+        // Build invoice-like message
+        const rateLine = vehicleInfo && vehicleInfo.pricePerKm ? `Rate: ₹${vehicleInfo.pricePerKm}/km\n` : '';
+        const seatsLine = vehicleInfo && vehicleInfo.seats ? ` (${vehicleInfo.seats} seats)` : '';
+        const message = `*${companyName} — Invoice*\n\n` +
+            `Booking ID: ${bookingId}\n` +
+            `Customer: ${customerName}\n` +
+            `Travel Date: ${dateStr}\n` +
+            `Vehicle: ${vehicleType}${seatsLine}\n` +
+            rateLine +
+            `Charges include driver allowance. Tolls, parking, and state taxes extra.\n` +
+            `Final amount will be based on actual kilometers.\n\n` +
+            `Reply CONFIRM to proceed. Thank you!`;
+        
+        // Open WhatsApp to send confirmation message
+        window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
+        
+        // Reload bookings to show updated status
+        loadBookings();
+        
+        alert('Booking confirmed! WhatsApp opened to send confirmation message to customer.');
+    } catch (error) {
+        console.error('Error confirming booking:', error);
+        alert('Error confirming booking. Please try again.');
+    }
+}
+
+async function deleteBooking(bookingId) {
+    if (!confirm(`Are you sure you want to delete booking ${bookingId}?`)) return;
+    
+    try {
+        const response = await fetch(`${API_URL}/bookings/${bookingId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            alert('Booking deleted successfully!');
+            loadBookings();
+        } else {
+            alert('Failed to delete booking');
+        }
+    } catch (error) {
+        console.error('Error deleting booking:', error);
+        alert('Error deleting booking');
+    }
+}
+
+// Filter bookings by booking ID
+let allBookingsCache = [];
+
+function filterBookings() {
+    const searchInput = document.getElementById('bookingSearchInput');
+    if (!searchInput) return;
+    
+    const searchTerm = searchInput.value.trim().toUpperCase();
+    
+    if (searchTerm === '') {
+        // Show all bookings
+        renderBookingsTable(allBookingsCache);
+    } else {
+        // Filter bookings by ID
+        const filtered = allBookingsCache.filter(booking => 
+            booking.bookingId.toUpperCase().includes(searchTerm)
+        );
+        renderBookingsTable(filtered);
     }
 }
 

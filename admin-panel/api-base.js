@@ -2,7 +2,7 @@
 // Replace <MAIN_PROJECT_HOST> with your actual main project hostname after first deploy
 // Example: https://hauntingvoyagers-main.vercel.app
 (function(){
-  var DEFAULT_HOST = 'hauntingvoyagers.vercel.app'; // main project host
+  var DEFAULT_HOST = ''; // set to your production host if different domain
   var isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
   var localBase = 'http://localhost:3000/api';
   var prodBase = DEFAULT_HOST ? ('https://' + DEFAULT_HOST + '/api') : '/api';
