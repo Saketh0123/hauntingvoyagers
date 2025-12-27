@@ -636,7 +636,9 @@
         })();
     </script>
         <script>
-            const API_URL = (typeof window !== 'undefined' && window.API_BASE) ? window.API_BASE : 'http://localhost:3000/api';
+            const API_URL = (typeof window !== 'undefined' && window.API_BASE)
+                ? window.API_BASE
+                : (window.location.hostname === 'localhost' ? 'http://localhost:3000/api' : '/api');
 
             async function loadVehiclesDynamic() {
                 const grid = document.getElementById('vehiclesGrid');
@@ -1042,8 +1044,8 @@
     <script>
         // Load admin settings for footer, header logo, and social links
         async function loadAdminSettings() {
-            const base = window.location.origin.includes('localhost') ? 'http://localhost:3000' : window.location.origin;
-            const endpoint = base + '/api/settings';
+            const base = (window.location.hostname === 'localhost') ? 'http://localhost:3000' : '';
+            const endpoint = (base ? base : '') + '/api/settings';
             
             let settings = window.__INITIAL_ADMIN_SETTINGS__;
             if (settings) {
