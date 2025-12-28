@@ -375,7 +375,7 @@ app.put('/api/settings', async (req, res) => {
 // Get all bookings
 app.get('/api/bookings', async (req, res) => {
   try {
-    const bookings = Booking.getAllBookings();
+    const bookings = await Booking.getAllBookings();
     res.json(bookings);
   } catch (error) {
     console.error('Error fetching bookings:', error);
@@ -404,7 +404,7 @@ app.post('/api/bookings', async (req, res) => {
 // Get booking by ID
 app.get('/api/bookings/:id', async (req, res) => {
   try {
-    const booking = Booking.getBookingById(req.params.id);
+    const booking = await Booking.getBookingById(req.params.id);
     if (!booking) {
       return res.status(404).json({ error: 'Booking not found' });
     }
@@ -418,7 +418,7 @@ app.get('/api/bookings/:id', async (req, res) => {
 // Update booking (e.g., confirm status)
 app.put('/api/bookings/:id', async (req, res) => {
   try {
-    const updatedBooking = Booking.updateBooking(req.params.id, req.body);
+    const updatedBooking = await Booking.updateBooking(req.params.id, req.body);
     if (!updatedBooking) {
       return res.status(404).json({ error: 'Booking not found' });
     }
@@ -432,7 +432,7 @@ app.put('/api/bookings/:id', async (req, res) => {
 // Delete booking
 app.delete('/api/bookings/:id', async (req, res) => {
   try {
-    const deleted = Booking.deleteBooking(req.params.id);
+    const deleted = await Booking.deleteBooking(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: 'Booking not found' });
     }
