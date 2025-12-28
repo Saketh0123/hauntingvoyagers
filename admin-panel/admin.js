@@ -1,7 +1,5 @@
 // Use centralized API base injected by api-base.js, fallback to localhost
-const API_URL = (typeof window !== 'undefined' && window.API_BASE)
-    ? window.API_BASE
-    : (window.location.hostname === 'localhost' ? 'http://localhost:3000/api' : '/api');
+const API_URL = (typeof window !== 'undefined' && window.API_BASE) ? window.API_BASE : 'http://localhost:3000/api';
 const ADMIN_USERNAME = 'admin';
 const ADMIN_PASSWORD = 'admin123';
 const CLOUDINARY_CLOUD_NAME = 'dfw1w02tb';
@@ -330,6 +328,7 @@ function showView(viewName) {
         document.getElementById('travellsView').classList.remove('hidden');
         loadTravells();
         loadHeroImages();
+        loadPricingCards();
     } else if (viewName === 'bookings') {
         document.getElementById('bookingsView').classList.remove('hidden');
         loadBookings();
@@ -761,6 +760,140 @@ async function deleteHeroImage(id) {
         console.error('Error deleting hero image:', error); alert('Error deleting hero image');
     }
 }
+
+// ==================== PRICING CARDS MANAGEMENT ====================
+
+function openPricingModal() {
+    document.getElementById('pricingModalTitle').textContent = 'Add Pricing Card';
+    document.getElementById('pricingForm').reset();
+    document.getElementById('pricingId').value = '';
+    const features = document.getElementById('pricingFeaturesInputs');
+    if (features) { features.innerHTML = ''; addPricingFeature(); }
+    document.getElementById('pricingModal').classList.add('active');
+}
+
+function closePricingModal() {
+    document.getElementById('pricingModal').classList.remove('active');
+}
+
+function addPricingFeature() {
+    const container = document.getElementById('pricingFeaturesInputs');
+    const div = document.createElement('div');
+    div.className = 'flex gap-2';
+    div.innerHTML = `
+        <input type="text" class="pricing-feature-input flex-1 px-4 py-2 border rounded-lg" placeholder="e.g., 8 hours / 80km">
+        <button type="button" onclick="this.parentElement.remove()" class="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600">Remove</button>`;
+    container.appendChild(div);
+}
+
+async function loadPricingCards() {
+    try {
+        const res = await fetch(`${API_URL}/pricing?status=all`);
+        let cards = await res.json();
+        if (!Array.isArray(cards)) cards = [];
+
+        // Prefill defaults if empty
+        if (cards.length === 0) {
+            await prefillPricingDefaults();
+            const refetch = await fetch(`${API_URL}/pricing?status=all`);
+            cards = await refetch.json();
+        }
+
+        const tbody = document.getElementById('pricingCardsTableBody');
+        if (!tbody) return;
+        if (cards.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-gray-500">No pricing cards</td></tr>';
+            return;
+        }
+        tbody.innerHTML = cards.sort((a,b)=>a.displayOrder-b.displayOrder).map(card => `
+            <tr>
+                <td>${card.title}</td>
+                <td>${card.subtitle}</td>
+                <td>₹${card.price} ${card.priceUnit}</td>
+                <td><div class="text-sm">${(card.features||[]).slice(0,2).map(f=>`<div>• ${f}</div>`).join('')}${(card.features||[]).length>2?`<div class='text-gray-500'>+${card.features.length-2} more</div>`:''}</div></td>
+                <td>${card.isPopular?'<span class="badge badge-success">Yes</span>':'<span class="badge">No</span>'}</td>
+                <td><span class="px-2 py-1 rounded text-xs ${card.isActive? 'bg-green-100 text-green-800':'bg-gray-100 text-gray-800'}">${card.isActive? 'Active':'Inactive'}</span></td>
+                <td>
+                    <button onclick="editPricingCard('${card._id}')" class="btn-edit">Edit</button>
+                    <button onclick="deletePricingCard('${card._id}')" class="btn-delete ml-2">Delete</button>
+                </td>
+            </tr>`).join('');
+    } catch (err) {
+        console.error('loadPricingCards error:', err);
+        const tbody = document.getElementById('pricingCardsTableBody');
+        if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-red-500">Error loading pricing</td></tr>';
+    }
+}
+
+async function prefillPricingDefaults() {
+    const defaults = [
+        { title:'Local Travel', subtitle:'Within city limits (up to 80km)', price:'3,500', priceUnit:'/day', features:['8 hours / 80km','Driver allowance included','Fuel included','Toll charges extra'], isPopular:false, displayOrder:1, isActive:true, bgGradient:'from-orange-50 to-pink-50' },
+        { title:'Outstation', subtitle:'Beyond city limits', price:'22', priceUnit:'/km', features:['Unlimited hours','Driver allowance included','Fuel included','Minimum 250km/day'], isPopular:true, displayOrder:2, isActive:true, bgGradient:'from-purple-50 to-blue-50' },
+        { title:'Multi-Day', subtitle:'Extended tours', price:'5,500', priceUnit:'/day', features:['250km per day','Driver accommodation','Fuel included','Flexible itinerary'], isPopular:false, displayOrder:3, isActive:true, bgGradient:'from-green-50 to-teal-50' }
+    ];
+    try {
+        for (const card of defaults) {
+            await fetch(`${API_URL}/pricing`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(card) });
+        }
+    } catch (e) { console.error('prefillPricingDefaults error:', e); }
+}
+
+async function editPricingCard(id) {
+    try {
+        const res = await fetch(`${API_URL}/pricing/${id}`);
+        const card = await res.json();
+        document.getElementById('pricingModalTitle').textContent = 'Edit Pricing Card';
+        document.getElementById('pricingId').value = card._id;
+        document.getElementById('pricingTitle').value = card.title;
+        document.getElementById('pricingSubtitle').value = card.subtitle;
+        document.getElementById('pricingPrice').value = card.price;
+        document.getElementById('pricingPriceUnit').value = card.priceUnit;
+        document.getElementById('pricingGradient').value = card.bgGradient || 'from-orange-50 to-pink-50';
+        document.getElementById('pricingOrder').value = card.displayOrder || 0;
+        document.getElementById('pricingPopular').checked = !!card.isPopular;
+        document.getElementById('pricingActive').checked = !!card.isActive;
+        const features = document.getElementById('pricingFeaturesInputs');
+        features.innerHTML = '';
+        (card.features||[]).forEach(f=>{
+            const div = document.createElement('div');
+            div.className = 'flex gap-2';
+            div.innerHTML = `
+                <input type=\"text\" class=\"pricing-feature-input flex-1 px-4 py-2 border rounded-lg\" value=\"${f.replace(/"/g,'&quot;')}\"> 
+                <button type=\"button\" onclick=\"this.parentElement.remove()\" class=\"px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600\">Remove</button>`;
+            features.appendChild(div);
+        });
+        document.getElementById('pricingModal').classList.add('active');
+    } catch (e) { console.error('editPricingCard error:', e); alert('Error loading card'); }
+}
+
+async function deletePricingCard(id) {
+    if (!confirm('Delete this pricing card?')) return;
+    try {
+        const res = await fetch(`${API_URL}/pricing/${id}`, { method:'DELETE' });
+        if (res.ok) { alert('Deleted'); loadPricingCards(); } else { alert('Delete failed'); }
+    } catch (e) { console.error('deletePricingCard error:', e); alert('Error'); }
+}
+
+document.getElementById('pricingForm')?.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const data = {
+        title: document.getElementById('pricingTitle').value.trim(),
+        subtitle: document.getElementById('pricingSubtitle').value.trim(),
+        price: document.getElementById('pricingPrice').value.trim(),
+        priceUnit: document.getElementById('pricingPriceUnit').value.trim(),
+        bgGradient: document.getElementById('pricingGradient').value,
+        displayOrder: parseInt(document.getElementById('pricingOrder').value)||0,
+        isPopular: document.getElementById('pricingPopular').checked,
+        isActive: document.getElementById('pricingActive').checked,
+        features: Array.from(document.querySelectorAll('.pricing-feature-input')).map(i=>i.value.trim()).filter(Boolean)
+    };
+    if (!data.title || !data.subtitle || !data.price || !data.priceUnit) { alert('Fill all required fields'); return; }
+    try {
+        const id = document.getElementById('pricingId').value;
+        const res = await fetch(id?`${API_URL}/pricing/${id}`:`${API_URL}/pricing`, { method: id?'PUT':'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
+        if (res.ok) { alert('Saved'); closePricingModal(); loadPricingCards(); } else { const err = await res.json(); alert('Save failed: '+(err.error||'Unknown')); }
+    } catch (e) { console.error('save pricing error:', e); alert('Error'); }
+});
 
 // ==================== BOOKINGS MANAGEMENT ====================
 

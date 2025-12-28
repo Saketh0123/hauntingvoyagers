@@ -4,33 +4,16 @@ npm-debug.log*
 yarn.lock
 pnpm-lock.yaml
 
-# Env & secrets
+# Env
 .env
 .env.local
-.env.*
 
 # Vercel local config
 .vercel/
 
-# OS/Editor
+# OS
 .DS_Store
 Thumbs.db
-.vscode/
 
 # Logs
 *.log
-logs/
-
-# Build outputs
-out/
-dist/
-.tmp/
-
-# Cache
-.cache/
-
-# Tests/Misc
-coverage/
-
-# Legacy local storage (not used on Vercel)
-api/bookings.json

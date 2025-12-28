@@ -9,6 +9,7 @@ const Settings = require('./settingsModel');
 const Travell = require('./travellModel');
 const HeroImage = require('./heroImageModel');
 const Booking = require('./bookingModel');
+const PricingCard = require('./pricingModel');
 const { uploadImage, uploadMultipleImages } = require('./cloudinary');
 
 const app = express();
@@ -374,7 +375,7 @@ app.put('/api/settings', async (req, res) => {
 // Get all bookings
 app.get('/api/bookings', async (req, res) => {
   try {
-    const bookings = await Booking.find({}).sort({ createdAt: -1 });
+    const bookings = Booking.getAllBookings();
     res.json(bookings);
   } catch (error) {
     console.error('Error fetching bookings:', error);
@@ -385,33 +386,28 @@ app.get('/api/bookings', async (req, res) => {
 // Create new booking
 app.post('/api/bookings', async (req, res) => {
   try {
-    const booking = new Booking({
+    const bookingData = {
       name: req.body.name,
       phone: req.body.phone,
       travelDate: req.body.travelDate,
       vehicleType: req.body.vehicleType,
       additionalRequirements: req.body.additionalRequirements || ''
-    });
-    await booking.save();
-    res.status(201).json(booking);
+    };
+    const newBooking = await Booking.createBooking(bookingData);
+    res.status(201).json(newBooking);
   } catch (error) {
     console.error('Error creating booking:', error);
     res.status(400).json({ error: error.message });
   }
 });
 
-// Get booking by ID (supports both Mongo _id and bookingId)
+// Get booking by ID
 app.get('/api/bookings/:id', async (req, res) => {
   try {
-    const { id } = req.params;
-    let booking = null;
-    if (id.match(/^[a-fA-F0-9]{24}$/)) {
-      booking = await Booking.findById(id);
-    }
+    const booking = Booking.getBookingById(req.params.id);
     if (!booking) {
-      booking = await Booking.findOne({ bookingId: id });
+      return res.status(404).json({ error: 'Booking not found' });
     }
-    if (!booking) return res.status(404).json({ error: 'Booking not found' });
     res.json(booking);
   } catch (error) {
     console.error('Error fetching booking:', error);
@@ -422,16 +418,11 @@ app.get('/api/bookings/:id', async (req, res) => {
 // Update booking (e.g., confirm status)
 app.put('/api/bookings/:id', async (req, res) => {
   try {
-    const { id } = req.params;
-    let updated = null;
-    if (id.match(/^[a-fA-F0-9]{24}$/)) {
-      updated = await Booking.findByIdAndUpdate(id, req.body, { new: true });
+    const updatedBooking = Booking.updateBooking(req.params.id, req.body);
+    if (!updatedBooking) {
+      return res.status(404).json({ error: 'Booking not found' });
     }
-    if (!updated) {
-      updated = await Booking.findOneAndUpdate({ bookingId: id }, req.body, { new: true });
-    }
-    if (!updated) return res.status(404).json({ error: 'Booking not found' });
-    res.json(updated);
+    res.json(updatedBooking);
   } catch (error) {
     console.error('Error updating booking:', error);
     res.status(400).json({ error: error.message });
@@ -441,18 +432,70 @@ app.put('/api/bookings/:id', async (req, res) => {
 // Delete booking
 app.delete('/api/bookings/:id', async (req, res) => {
   try {
-    const { id } = req.params;
-    let deleted = null;
-    if (id.match(/^[a-fA-F0-9]{24}$/)) {
-      deleted = await Booking.findByIdAndDelete(id);
-    }
+    const deleted = Booking.deleteBooking(req.params.id);
     if (!deleted) {
-      deleted = await Booking.findOneAndDelete({ bookingId: id });
+      return res.status(404).json({ error: 'Booking not found' });
     }
-    if (!deleted) return res.status(404).json({ error: 'Booking not found' });
     res.json({ message: 'Booking deleted successfully' });
   } catch (error) {
     console.error('Error deleting booking:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== PRICING CARDS ROUTES ====================
+
+// Get all pricing cards
+app.get('/api/pricing', async (req, res) => {
+  try {
+    const filter = req.query.status === 'all' ? {} : { isActive: true };
+    const cards = await PricingCard.find(filter).sort({ displayOrder: 1, createdAt: 1 });
+    res.json(cards);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get single pricing card
+app.get('/api/pricing/:id', async (req, res) => {
+  try {
+    const card = await PricingCard.findById(req.params.id);
+    if (!card) return res.status(404).json({ error: 'Pricing card not found' });
+    res.json(card);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create pricing card
+app.post('/api/pricing', async (req, res) => {
+  try {
+    const card = new PricingCard(req.body);
+    await card.save();
+    res.status(201).json(card);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Update pricing card
+app.put('/api/pricing/:id', async (req, res) => {
+  try {
+    const card = await PricingCard.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: false, strict: false });
+    if (!card) return res.status(404).json({ error: 'Pricing card not found' });
+    res.json(card);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Delete pricing card
+app.delete('/api/pricing/:id', async (req, res) => {
+  try {
+    const card = await PricingCard.findByIdAndDelete(req.params.id);
+    if (!card) return res.status(404).json({ error: 'Pricing card not found' });
+    res.json({ message: 'Pricing card deleted successfully' });
+  } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });

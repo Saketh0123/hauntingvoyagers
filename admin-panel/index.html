@@ -734,6 +734,32 @@
                     </div>
                     <div id="heroImagesGrid" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
                 </div>
+
+                <!-- Pricing Cards Management -->
+                <div class="bg-white rounded-lg p-6 shadow mt-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-bold">Pricing Cards</h3>
+                        <button onclick="openPricingModal()" class="btn-primary">+ Add Pricing Card</button>
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Title</th>
+                                    <th>Subtitle</th>
+                                    <th>Price</th>
+                                    <th>Features</th>
+                                    <th>Popular</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pricingCardsTableBody">
+                                <tr><td colspan="7" class="text-center py-8 text-gray-500">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
 
             <!-- Bookings Management View -->
@@ -1031,6 +1057,70 @@
                     <div class="form-actions">
                         <button type="button" onclick="closeHeroImageModal()" class="btn-secondary">Cancel</button>
                         <button type="submit" class="btn-primary">Add Image</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pricing Card Modal -->
+    <div id="pricingModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="pricingModalTitle">Add Pricing Card</h3>
+                <button class="modal-close" onclick="closePricingModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="pricingForm">
+                    <input type="hidden" id="pricingId">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="form-group">
+                            <label>Title *</label>
+                            <input type="text" id="pricingTitle" required placeholder="Local Travel">
+                        </div>
+                        <div class="form-group">
+                            <label>Subtitle *</label>
+                            <input type="text" id="pricingSubtitle" required placeholder="Within city limits (up to 80km)">
+                        </div>
+                        <div class="form-group">
+                            <label>Price *</label>
+                            <input type="text" id="pricingPrice" required placeholder="3,500 or 22">
+                        </div>
+                        <div class="form-group">
+                            <label>Price Unit *</label>
+                            <input type="text" id="pricingPriceUnit" required placeholder="/day or /km">
+                        </div>
+                        <div class="form-group">
+                            <label>Background Gradient</label>
+                            <select id="pricingGradient">
+                                <option value="from-orange-50 to-pink-50">Orange→Pink</option>
+                                <option value="from-purple-50 to-blue-50">Purple→Blue</option>
+                                <option value="from-green-50 to-teal-50">Green→Teal</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Display Order</label>
+                            <input type="number" id="pricingOrder" value="0">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="flex items-center gap-2">
+                            <input type="checkbox" id="pricingPopular"> <span>Mark as Most Popular</span>
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label class="flex items-center gap-2">
+                            <input type="checkbox" id="pricingActive" checked> <span>Active</span>
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>Features</label>
+                        <div id="pricingFeaturesInputs" class="space-y-2"></div>
+                        <button type="button" onclick="addPricingFeature()" class="mt-2 px-3 py-1 bg-gray-200 rounded text-sm">+ Add Feature</button>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" onclick="closePricingModal()" class="btn-secondary">Cancel</button>
+                        <button type="submit" class="btn-primary">Save Pricing Card</button>
                     </div>
                 </form>
             </div>

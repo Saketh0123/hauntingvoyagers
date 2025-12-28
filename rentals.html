@@ -3,9 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vehicle Rentals - Haunting Voyagers</title>
+    <title>Vehicle Rentals - P SQUARE HOLIDAYS</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        * { box-sizing: border-box; }
+        html, body { 
+            overflow-x: hidden; 
+            width: 100%; 
+            max-width: 100vw;
+            margin: 0;
+            padding: 0;
+        }
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
         .animate-fade-in { animation: fade-in 0.5s ease-in; }
@@ -56,29 +64,32 @@
                 min-height: 500px;
                 padding: 2rem 1rem;
                 gap: 0;
-                overflow: visible;
+                overflow: hidden !important;
+                width: 100%;
             }
             .pricing-box {
                 position: absolute;
-                width: 280px;
+                width: 75%;
+                max-width: 280px;
                 transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
                 cursor: pointer;
             }
             .pricing-box.card-left {
-                left: 0;
-                transform: translateX(-20%) scale(0.85);
+                left: 5%;
+                transform: translateX(-10%) scale(0.85);
                 z-index: 1;
                 opacity: 0.7;
             }
             .pricing-box.card-center {
-                position: relative;
+                left: 50%;
+                transform: translateX(-50%) scale(1);
                 z-index: 3;
-                transform: scale(1);
                 opacity: 1;
             }
             .pricing-box.card-right {
-                right: 0;
-                transform: translateX(20%) scale(0.85);
+                right: 5%;
+                left: auto;
+                transform: translateX(10%) scale(0.85);
                 z-index: 1;
                 opacity: 0.7;
             }
@@ -89,13 +100,21 @@
         
         @media (max-width: 640px) {
             .pricing-box {
-                width: 260px;
+                width: 80%;
+                max-width: 260px;
             }
             .pricing-box.card-left {
-                transform: translateX(-25%) scale(0.8);
+                left: 3%;
+                transform: translateX(-8%) scale(0.8);
+            }
+            .pricing-box.card-center {
+                left: 50%;
+                transform: translateX(-50%) scale(1);
             }
             .pricing-box.card-right {
-                transform: translateX(25%) scale(0.8);
+                right: 3%;
+                left: auto;
+                transform: translateX(8%) scale(0.8);
             }
         }
         
@@ -104,7 +123,8 @@
             .use-case-grid {
                 display: grid !important;
                 grid-template-columns: repeat(2, 1fr) !important;
-                gap: 1rem;
+                gap: 0.75rem !important;
+                width: 100%;
             }
             .use-case-box {
                 aspect-ratio: 1 / 1;
@@ -119,11 +139,13 @@
                 box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
             }
             .use-case-box h3 {
-                font-size: 1rem !important;
+                font-size: 0.9rem !important;
                 margin-bottom: 0.5rem !important;
+                text-align: center;
             }
             .use-case-box p {
-                font-size: 0.875rem !important;
+                font-size: 0.75rem !important;
+                text-align: center;
             }
             .use-case-icon {
                 width: 3rem !important;
@@ -133,6 +155,34 @@
             .use-case-icon svg {
                 width: 1.5rem !important;
                 height: 1.5rem !important;
+            }
+        }
+
+        /* Extra small screens (350-480px): Smaller boxes to fit */
+        @media (max-width: 480px) {
+            .use-case-grid {
+                gap: 0.5rem !important;
+            }
+            .use-case-box {
+                padding: 1rem 0.5rem !important;
+            }
+            .use-case-box h3 {
+                font-size: 0.75rem !important;
+                margin-bottom: 0.25rem !important;
+                line-height: 1.2;
+            }
+            .use-case-box p {
+                font-size: 0.65rem !important;
+                line-height: 1.3;
+            }
+            .use-case-icon {
+                width: 2.5rem !important;
+                height: 2.5rem !important;
+                margin-bottom: 0.5rem !important;
+            }
+            .use-case-icon svg {
+                width: 1.25rem !important;
+                height: 1.25rem !important;
             }
         }
         
@@ -180,30 +230,30 @@
         #hero-rentals {
             height: 550px;
             min-height: 550px;
-            max-height: 550x;
+            max-height: 550px;
         }
         
         /* Hero section mobile height - separate media query for better specificity */
         @media (max-width: 768px) {
             #hero-rentals {
-                height: 350px !important;
-                min-height: 350px !important;
-                max-height: 350px !important;
+                height: 300px !important;
+                min-height: 300px !important;
+                max-height: 300px !important;
             }
             
             /* Hero text responsive sizing */
             #hero-rentals h2 {
-                font-size: 1.875rem !important; /* 3xl */
+                font-size: 1.5rem !important; /* 2xl */
             }
             #hero-rentals h1 {
-                font-size: 1.875rem !important; /* 3xl */
+                font-size: 1.5rem !important; /* 2xl */
             }
             #hero-rentals p {
                 font-size: 0.875rem !important; /* sm */
             }
             #hero-rentals button {
                 font-size: 0.875rem !important; /* sm */
-                padding: 0.5rem 1.5rem !important;
+                padding: 0.5rem 1.25rem !important;
             }
         }
         @media (max-width: 640px) {
@@ -223,7 +273,8 @@
             .why-choose-grid {
                 display: grid !important;
                 grid-template-columns: repeat(2, 1fr) !important;
-                gap: 1rem;
+                gap: 0.75rem !important;
+                width: 100%;
             }
             .why-choose-box {
                 padding: 1.5rem 1rem !important;
@@ -233,11 +284,13 @@
                 box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
             }
             .why-choose-box h3 {
-                font-size: 1rem !important;
+                font-size: 0.9rem !important;
                 margin-bottom: 0.5rem !important;
+                text-align: center;
             }
             .why-choose-box p {
-                font-size: 0.875rem !important;
+                font-size: 0.75rem !important;
+                text-align: center;
             }
             .why-choose-icon {
                 width: 3.5rem !important;
@@ -249,13 +302,78 @@
                 height: 1.75rem !important;
             }
         }
+
+        /* Extra small screens (350-480px): Smaller why-choose boxes */
+        @media (max-width: 480px) {
+            .why-choose-grid {
+                gap: 0.5rem !important;
+            }
+            .why-choose-box {
+                padding: 1rem 0.5rem !important;
+            }
+            .why-choose-box h3 {
+                font-size: 0.75rem !important;
+                margin-bottom: 0.25rem !important;
+                line-height: 1.2;
+            }
+            .why-choose-box p {
+                font-size: 0.65rem !important;
+                line-height: 1.3;
+            }
+            .why-choose-icon {
+                width: 2.5rem !important;
+                height: 2.5rem !important;
+                margin-bottom: 0.5rem !important;
+            }
+            .why-choose-icon svg {
+                width: 1.25rem !important;
+                height: 1.25rem !important;
+            }
+        }
+
+        /* Ready to Book section - Mobile responsive */
+        @media (max-width: 768px) {
+            #contact .grid {
+                grid-template-columns: 1fr !important;
+                gap: 1.5rem !important;
+                padding: 0 !important;
+            }
+            #contact .bg-white\/10,
+            #contact .bg-white {
+                width: 100% !important;
+                max-width: 100% !important;
+                padding: 1.5rem !important;
+                box-sizing: border-box;
+            }
+        }
+
+        @media (max-width: 480px) {
+            #contact .bg-white\/10,
+            #contact .bg-white {
+                padding: 1rem !important;
+            }
+            #contact h3 {
+                font-size: 1.25rem !important;
+            }
+            #contact .space-y-4 {
+                gap: 0.75rem !important;
+            }
+            #contact input,
+            #contact select,
+            #contact textarea,
+            #contact button {
+                padding: 0.625rem 0.75rem !important;
+                font-size: 0.875rem !important;
+            }
+        }
         
         /* Mobile: Safety boxes - 2 per row like use-cases */
         @media (max-width: 768px) {
             .safety-grid {
                 display: grid !important;
                 grid-template-columns: repeat(2, 1fr) !important;
-                gap: 1rem;
+                gap: 0.75rem !important;
+                width: 100%;
             }
             .safety-box {
                 aspect-ratio: 1 / 1;
@@ -267,15 +385,40 @@
                 box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
             }
             .safety-box h3 {
-                font-size: 1rem !important;
+                font-size: 0.9rem !important;
                 margin-bottom: 0.5rem !important;
+                text-align: center;
             }
             .safety-box p {
-                font-size: 0.875rem !important;
+                font-size: 0.75rem !important;
+                text-align: center;
             }
             .safety-box .text-4xl {
                 font-size: 2rem !important;
                 margin-bottom: 0.5rem !important;
+            }
+        }
+
+        /* Extra small screens (350-480px): Smaller safety boxes */
+        @media (max-width: 480px) {
+            .safety-grid {
+                gap: 0.5rem !important;
+            }
+            .safety-box {
+                padding: 1rem 0.5rem !important;
+            }
+            .safety-box h3 {
+                font-size: 0.75rem !important;
+                margin-bottom: 0.25rem !important;
+                line-height: 1.2;
+            }
+            .safety-box p {
+                font-size: 0.65rem !important;
+                line-height: 1.3;
+            }
+            .safety-box .text-4xl {
+                font-size: 1.5rem !important;
+                margin-bottom: 0.25rem !important;
             }
         }
         
@@ -391,8 +534,25 @@
         }
         
         /* Hero Slider */
-        .hero-slide { display: none; opacity: 0; transition: opacity 1s ease-in-out; }
-        .hero-slide.active { display: block; opacity: 1; }
+        .hero-slide { 
+            display: none; 
+            opacity: 0; 
+            transition: opacity 1s ease-in-out;
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+        .hero-slide.active { 
+            display: block; 
+            opacity: 1; 
+        }
+        .hero-slide img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+        }
         
         /* Mobile Overlay Menu - Horizontal Style (matching home.html) */
         #mobile-menu-overlay {
@@ -636,9 +796,7 @@
         })();
     </script>
         <script>
-            const API_URL = (typeof window !== 'undefined' && window.API_BASE)
-                ? window.API_BASE
-                : (window.location.hostname === 'localhost' ? 'http://localhost:3000/api' : '/api');
+            const API_URL = (typeof window !== 'undefined' && window.API_BASE) ? window.API_BASE : 'http://localhost:3000/api';
 
             async function loadVehiclesDynamic() {
                 const grid = document.getElementById('vehiclesGrid');
@@ -730,12 +888,12 @@
         </div>
         
         <div class="relative z-10 text-center px-4 max-w-5xl mx-auto animate-fade-in">
-            <h2 class="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-6 bg-gradient-to-r from-yellow-300 to-orange-400 bg-clip-text text-transparent">Haunting Voyagers</h2>
-            <h1 class="text-4xl sm:text-5xl md:text-6xl font-bold text-white mb-6">Premium Bus & Tempo Rentals</h1>
-            <p class="text-lg md:text-xl text-white/90 mb-8 max-w-2xl mx-auto">Comfortable, safe, and affordable vehicle rentals for all your travel needs</p>
-            <div class="flex flex-wrap gap-4 justify-center">
-                <a href="#contact"><button class="bg-gradient-to-r from-orange-500 to-pink-600 hover:from-orange-600 hover:to-pink-700 text-white px-8 py-3 rounded-full font-semibold text-lg shadow-xl transition-all">Book Now</button></a>
-                <a href="#vehicles"><button class="bg-white/10 backdrop-blur-md text-white border-2 border-white/50 hover:bg-white/20 px-8 py-3 rounded-full font-semibold text-lg transition-all">View Vehicles</button></a>
+            <h2 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-1 bg-gradient-to-r from-yellow-300 to-orange-400 bg-clip-text text-transparent">P SQUARE HOLIDAYS</h2>
+            <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-2">Premium Bus & Tempo Rentals</h1>
+            <p class="text-base md:text-lg text-white/90 mb-4 max-w-2xl mx-auto">Comfortable, safe, and affordable vehicle rentals for all your travel needs</p>
+            <div class="flex flex-wrap gap-3 justify-center">
+                <a href="#contact"><button class="bg-gradient-to-r from-orange-500 to-pink-600 hover:from-orange-600 hover:to-pink-700 text-white px-6 py-2.5 rounded-full font-semibold text-base shadow-xl transition-all">Book Now</button></a>
+                <a href="#vehicles"><button class="bg-white/10 backdrop-blur-md text-white border-2 border-white/50 hover:bg-white/20 px-6 py-2.5 rounded-full font-semibold text-base transition-all">View Vehicles</button></a>
             </div>
         </div>
     </section>
@@ -804,51 +962,7 @@
                 <p class="text-lg text-gray-600">No hidden charges, pay for what you use</p>
             </div>
             <div class="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto pricing-container">
-                <div class="pricing-box bg-gradient-to-br from-orange-50 to-pink-50 rounded-xl p-8">
-                    <h3 class="text-2xl font-bold mb-4 text-gray-900">Local Travel</h3>
-                    <p class="text-gray-600 mb-6">Within city limits (up to 80km)</p>
-                    <div class="mb-6">
-                        <span class="text-4xl font-bold text-gray-900">₹3,500</span>
-                        <span class="text-gray-600">/day</span>
-                    </div>
-                    <ul class="space-y-3 text-gray-700">
-                        <li class="flex items-center gap-2"><span class="check-icon text-xl">✓</span> 8 hours / 80km</li>
-                        <li class="flex items-center gap-2"><span class="check-icon text-xl">✓</span> Driver allowance included</li>
-                        <li class="flex items-center gap-2"><span class="check-icon text-xl">✓</span> Fuel included</li>
-                        <li class="flex items-center gap-2"><span class="check-icon text-xl">✓</span> Toll charges extra</li>
-                    </ul>
-                </div>
-
-                <div class="pricing-box bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl p-8">
-                    <div class="popular-badge bg-gradient-to-r from-orange-500 to-pink-600 text-white px-4 py-1 rounded-full text-sm font-semibold">Most Popular</div>
-                    <h3 class="text-2xl font-bold mb-4 text-gray-900">Outstation</h3>
-                    <p class="text-gray-600 mb-6">Beyond city limits</p>
-                    <div class="mb-6">
-                        <span class="text-4xl font-bold text-gray-900">₹22</span>
-                        <span class="text-gray-600">/km</span>
-                    </div>
-                    <ul class="space-y-3 text-gray-700">
-                        <li class="flex items-center gap-2"><span class="check-icon text-xl">✓</span> Unlimited hours</li>
-                        <li class="flex items-center gap-2"><span class="check-icon text-xl">✓</span> Driver allowance included</li>
-                        <li class="flex items-center gap-2"><span class="check-icon text-xl">✓</span> Fuel included</li>
-                        <li class="flex items-center gap-2"><span class="check-icon text-xl">✓</span> Minimum 250km/day</li>
-                    </ul>
-                </div>
-
-                <div class="pricing-box bg-gradient-to-br from-green-50 to-teal-50 rounded-xl p-8">
-                    <h3 class="text-2xl font-bold mb-4 text-gray-900">Multi-Day</h3>
-                    <p class="text-gray-600 mb-6">Extended tours</p>
-                    <div class="mb-6">
-                        <span class="text-4xl font-bold text-gray-900">₹5,500</span>
-                        <span class="text-gray-600">/day</span>
-                    </div>
-                    <ul class="space-y-3 text-gray-700">
-                        <li class="flex items-center gap-2"><span class="check-icon text-xl">✓</span> 250km per day</li>
-                        <li class="flex items-center gap-2"><span class="check-icon text-xl">✓</span> Driver accommodation</li>
-                        <li class="flex items-center gap-2"><span class="check-icon text-xl">✓</span> Fuel included</li>
-                        <li class="flex items-center gap-2"><span class="check-icon text-xl">✓</span> Flexible itinerary</li>
-                    </ul>
-                </div>
+                <!-- Will be populated dynamically by JS -->
             </div>
         </div>
     </section>
@@ -895,7 +1009,7 @@
                 <h2 class="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">Safety & Compliance</h2>
                 <p class="text-lg text-gray-600">Your safety is our top priority</p>
             </div>
-            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6 safety-grid">
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-6 safety-grid">
                 <div class="bg-gray-50 rounded-xl p-6 text-center safety-box">
                     <div class="text-4xl mb-3">🔒</div>
                     <h3 class="font-bold text-lg mb-2">GPS Tracking</h3>
@@ -988,21 +1102,21 @@
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
                             <div>
                                 <p class="font-semibold">Phone</p>
-                                <p>+91 98765 43210</p>
+                                <p id="contact-phone">Loading...</p>
                             </div>
                         </div>
                         <div class="flex items-center gap-3">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
                             <div>
                                 <p class="font-semibold">Email</p>
-                                <p>rentals@hauntingvoyagers.com</p>
+                                <p id="contact-email">Loading...</p>
                             </div>
                         </div>
                         <div class="flex items-center gap-3">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                             <div>
                                 <p class="font-semibold">Address</p>
-                                <p>Mumbai, Maharashtra</p>
+                                <p>Vijaya talkies road, Hanamkonda, Warangal</p>
                             </div>
                         </div>
                     </div>
@@ -1044,8 +1158,8 @@
     <script>
         // Load admin settings for footer, header logo, and social links
         async function loadAdminSettings() {
-            const base = (window.location.hostname === 'localhost') ? 'http://localhost:3000' : '';
-            const endpoint = (base ? base : '') + '/api/settings';
+            const base = window.location.origin.includes('localhost') ? 'http://localhost:3000' : window.location.origin;
+            const endpoint = base + '/api/settings';
             
             let settings = window.__INITIAL_ADMIN_SETTINGS__;
             if (settings) {
@@ -1130,11 +1244,18 @@
                 if (footer) {
                     const { email, phone, copyright, developerCredit, developerLink } = settings.footer;
                     
+                    // Update footer contact info
                     footer.querySelectorAll('p').forEach(p => {
                         if (p.textContent.includes('📧') && email) p.textContent = `📧 ${email}`;
                         if (p.textContent.includes('📞') && phone) p.textContent = `📞 ${phone}`;
                         if (/©/.test(p.textContent) && copyright) p.textContent = copyright;
                     });
+                    
+                    // Update contact section phone and email
+                    const contactPhone = document.getElementById('contact-phone');
+                    const contactEmail = document.getElementById('contact-email');
+                    if (contactPhone && phone) contactPhone.textContent = phone;
+                    if (contactEmail && email) contactEmail.textContent = email;
                     
                     // Update developer credit
                     const devCreditEl = document.getElementById('footer-developer-credit');
@@ -1243,7 +1364,7 @@
         setInterval(rotateHero, 5000);
 
         // Automatic sequential hover for pricing boxes
-        const pricingBoxes = document.querySelectorAll('.pricing-box');
+        let pricingBoxes = document.querySelectorAll('.pricing-box');
         let currentBox = 0;
         let autoHoverInterval;
         let isUserHovering = false;
@@ -1361,6 +1482,80 @@
             }
         }
 
+        // Load pricing cards dynamically
+        async function loadPricingCards() {
+            try {
+                const res = await fetch('/api/pricing');
+                const cards = await res.json();
+                const container = document.querySelector('.pricing-container');
+                if (!container) return;
+                if (!Array.isArray(cards) || cards.length === 0) {
+                    container.innerHTML = '<p class="text-center text-gray-500 col-span-3">Pricing will be updated soon.</p>';
+                    return;
+                }
+                container.innerHTML = cards
+                    .filter(c => c.isActive)
+                    .sort((a,b)=>a.displayOrder-b.displayOrder)
+                    .map(card => `
+                        <div class="pricing-box bg-gradient-to-br ${card.bgGradient} rounded-xl p-8">
+                            ${card.isPopular ? '<div class="popular-badge bg-gradient-to-r from-orange-500 to-pink-600 text-white px-4 py-1 rounded-full text-sm font-semibold">Most Popular</div>' : ''}
+                            <h3 class="text-2xl font-bold mb-4 text-gray-900">${card.title}</h3>
+                            <p class="text-gray-600 mb-6">${card.subtitle}</p>
+                            <div class="mb-6">
+                                <span class="text-4xl font-bold text-gray-900">₹${card.price}</span>
+                                <span class="text-gray-600">${card.priceUnit}</span>
+                            </div>
+                            <ul class="space-y-3 text-gray-700">
+                                ${(card.features||[]).map(f => `<li class=\"flex items-center gap-2\"><span class=\"check-icon text-xl\">✓</span> ${f}</li>`).join('')}
+                            </ul>
+                        </div>
+                    `).join('');
+
+                // Re-select boxes and wire interactions after dynamic render
+                pricingBoxes = container.querySelectorAll('.pricing-box');
+                if (isMobile()) {
+                    currentBox = 0;
+                    updateCardPositions();
+                }
+
+                // Tap to focus card (mobile)
+                pricingBoxes.forEach((box, index) => {
+                    box.addEventListener('click', () => {
+                        if (isMobile()) {
+                            currentBox = index;
+                            updateCardPositions();
+                            isUserHovering = true;
+                            clearTimeout(autoHoverInterval);
+                            setTimeout(() => { isUserHovering = false; autoHoverPricingBoxes(); }, 3000);
+                        }
+                    });
+                });
+
+                // Swipe gestures on mobile
+                let startX = 0, deltaX = 0;
+                container.addEventListener('touchstart', (e) => {
+                    startX = e.touches[0].clientX; deltaX = 0; isUserHovering = true; clearTimeout(autoHoverInterval);
+                }, { passive: true });
+                container.addEventListener('touchmove', (e) => {
+                    deltaX = e.touches[0].clientX - startX;
+                }, { passive: true });
+                container.addEventListener('touchend', () => {
+                    if (!isMobile() || pricingBoxes.length === 0) return;
+                    if (Math.abs(deltaX) > 40) {
+                        if (deltaX < 0) { // swipe left -> next
+                            currentBox = (currentBox + 1) % pricingBoxes.length;
+                        } else { // swipe right -> prev
+                            currentBox = (currentBox - 1 + pricingBoxes.length) % pricingBoxes.length;
+                        }
+                        updateCardPositions();
+                    }
+                    setTimeout(() => { isUserHovering = false; autoHoverPricingBoxes(); }, 2000);
+                });
+            } catch (err) {
+                console.error('Error loading pricing cards:', err);
+            }
+        }
+
         // Handle booking form submission
         document.getElementById('bookingForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -1427,8 +1622,9 @@
             }
         });
 
-        // Load vehicles on page load
+        // Load vehicles and pricing on page load
         loadVehicles();
+        loadPricingCards();
     </script>
 </body>
 </html>
