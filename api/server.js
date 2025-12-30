@@ -10,14 +10,14 @@ const fs = require('fs');
 const os = require('os');
 require('dotenv').config();
 
-const Tour = require('./tourModel');
-const Settings = require('./settingsModel');
-const Travell = require('./travellModel');
-const HeroImage = require('./heroImageModel');
-const Booking = require('./bookingModel');
-const PricingCard = require('./pricingModel');
-const Bill = require('./billModel');
-const { uploadImage, uploadMultipleImages } = require('./cloudinary');
+const Tour = require('../backend/tourModel');
+const Settings = require('../backend/settingsModel');
+const Travell = require('../backend/travellModel');
+const HeroImage = require('../backend/heroImageModel');
+const Booking = require('../backend/bookingModel');
+const PricingCard = require('../backend/pricingModel');
+const Bill = require('../backend/billModel');
+const { uploadImage, uploadMultipleImages } = require('../backend/cloudinary');
 
 const app = express();
 

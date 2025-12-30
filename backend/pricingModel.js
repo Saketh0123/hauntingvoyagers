@@ -3,8 +3,8 @@ const mongoose = require('mongoose');
 const PricingCardSchema = new mongoose.Schema({
   title: { type: String, required: true },
   subtitle: { type: String, required: true },
-  price: { type: String, required: true }, // e.g., "3,500" or "22"
-  priceUnit: { type: String, default: '/day' }, // '/day' or '/km'
+  price: { type: String, required: true },
+  priceUnit: { type: String, default: '/day' },
   features: { type: [String], default: [] },
   isPopular: { type: Boolean, default: false },
   displayOrder: { type: Number, default: 0 },

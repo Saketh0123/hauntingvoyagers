@@ -7,12 +7,6 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-/**
- * Upload image to Cloudinary
- * @param {string} base64String - Base64 encoded image string
- * @param {string} folder - Folder name in Cloudinary (e.g., 'logos', 'hero', 'tours')
- * @returns {Promise<string>} - Cloudinary URL
- */
 async function uploadImage(base64String, folder = 'travel-agency') {
   try {
     const result = await cloudinary.uploader.upload(base64String, {
@@ -30,10 +24,6 @@ async function uploadImage(base64String, folder = 'travel-agency') {
   }
 }
 
-/**
- * Delete image from Cloudinary
- * @param {string} publicId - Cloudinary public ID
- */
 async function deleteImage(publicId) {
   try {
     await cloudinary.uploader.destroy(publicId);
@@ -42,12 +32,6 @@ async function deleteImage(publicId) {
   }
 }
 
-/**
- * Upload multiple images
- * @param {Array<string>} base64Array - Array of base64 encoded images
- * @param {string} folder - Folder name in Cloudinary
- * @returns {Promise<Array<string>>} - Array of Cloudinary URLs
- */
 async function uploadMultipleImages(base64Array, folder = 'travel-agency') {
   try {
     const uploadPromises = base64Array.map(base64 => uploadImage(base64, folder));
