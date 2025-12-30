@@ -505,6 +505,10 @@
                     <span class="nav-icon">📝</span>
                     <span>Bookings</span>
                 </div>
+                <div class="nav-item" onclick="showView('bills')">
+                    <span class="nav-icon">🧾</span>
+                    <span>Bills</span>
+                </div>
                 <div class="nav-item" onclick="showView('home')">
                     <span class="nav-icon">🏠</span>
                     <span>Home Settings</span>
@@ -789,6 +793,53 @@
                         <tbody id="bookingsTableBody">
                             <tr>
                                 <td colspan="8" class="text-center py-8 text-gray-500">Loading bookings...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Bills Management View -->
+            <div id="billsView" class="view-content hidden">
+                <div class="content-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h1>Bill Management</h1>
+                    <button class="btn-primary" onclick="openBillModal()">
+                        <span>+ Create New Bill</span>
+                    </button>
+                </div>
+                
+                <!-- Search Filters -->
+                <div style="display: flex; gap: 15px; margin-bottom: 20px; align-items: flex-end;">
+                    <div class="form-group" style="flex: 1; margin: 0;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 500;">Search by Bill Number</label>
+                        <input type="number" id="billSearchInput" placeholder="Enter bill serial number (e.g., 1, 2, 3...)" 
+                               style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px;"
+                               oninput="filterBills()">
+                    </div>
+                    <div class="form-group" style="flex: 1; margin: 0;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 500;">Billing Date</label>
+                        <input type="date" id="billFilterDate" 
+                               style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px;"
+                               onchange="filterBills()">
+                    </div>
+                    <button onclick="clearBillFilters()" style="padding: 10px 20px; margin: 0; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: all 0.3s; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(245, 158, 11, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 4px rgba(245, 158, 11, 0.3)'">Clear Filters</button>
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Bill No</th>
+                                <th>Date</th>
+                                <th>Customer</th>
+                                <th>Contact</th>
+                                <th>Vehicle No</th>
+                                <th>Grand Total</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="billsTableBody">
+                            <tr>
+                                <td colspan="7" class="text-center py-8 text-gray-500">No bills created yet</td>
                             </tr>
                         </tbody>
                     </table>
@@ -1121,6 +1172,149 @@
                     <div class="form-actions">
                         <button type="button" onclick="closePricingModal()" class="btn-secondary">Cancel</button>
                         <button type="submit" class="btn-primary">Save Pricing Card</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bill Modal -->
+    <div id="billModal" class="modal">
+        <div class="modal-content" style="max-width: 1000px;">
+            <div class="modal-header">
+                <h3 id="billModalTitle">Create New Bill</h3>
+                <button class="modal-close" onclick="closeBillModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="billForm">
+                    <input type="hidden" id="billId">
+                    
+                    <!-- Bill Details Section -->
+                    <div class="mb-6">
+                        <h4 class="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">Bill Details</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label>Bill No *</label>
+                                <input type="text" id="billNo" required placeholder="Auto-generated or enter manually">
+                            </div>
+                            <div class="form-group">
+                                <label>Date *</label>
+                                <input type="date" id="billDate" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Seats *</label>
+                                <input type="number" id="billSeats" required placeholder="Number of seats">
+                            </div>
+                            <div class="form-group">
+                                <label>Vehicle Number *</label>
+                                <input type="text" id="billVehicleNo" required placeholder="e.g., TS09 XX 1234">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Customer Details Section -->
+                    <div class="mb-6">
+                        <h4 class="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">Customer Details</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label>Customer Name *</label>
+                                <input type="text" id="billCustomerName" required placeholder="Full name">
+                            </div>
+                            <div class="form-group">
+                                <label>Contact Number *</label>
+                                <input type="tel" id="billContactNo" required placeholder="Phone number">
+                            </div>
+                            <div class="form-group">
+                                <label>Customer Email *</label>
+                                <input type="email" id="billCustomerEmail" required placeholder="customer@example.com">
+                            </div>
+                            <div class="form-group md:col-span-2">
+                                <label>Address *</label>
+                                <textarea id="billAddress" required rows="2" placeholder="Complete address"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Travel Details Section -->
+                    <div class="mb-6">
+                        <h4 class="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">Travel Details</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label>Place / Destination *</label>
+                                <input type="text" id="billDestination" required placeholder="Destination">
+                            </div>
+                            <div class="form-group">
+                                <label>Date From *</label>
+                                <input type="date" id="billDateFrom" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Date To *</label>
+                                <input type="date" id="billDateTo" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pricing Details Section -->
+                    <div class="mb-6">
+                        <h4 class="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">Pricing Details</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label>Rs / KM *</label>
+                                <input type="number" id="billRatePerKm" required placeholder="Rate per kilometer" step="0.01" oninput="calculateBillTotal()">
+                            </div>
+                            <div class="form-group">
+                                <label>Total Amount *</label>
+                                <input type="number" id="billTotalAmount" required placeholder="Total amount" step="0.01" oninput="calculateBillTotal()">
+                            </div>
+                            <div class="form-group md:col-span-2">
+                                <label>Amount in Words</label>
+                                <input type="text" id="billAmountWords" readonly placeholder="Auto-calculated">
+                            </div>
+                            <div class="form-group">
+                                <label>Advance Paid *</label>
+                                <input type="number" id="billAdvance" required placeholder="Advance amount" step="0.01" value="0" oninput="calculateBillTotal()">
+                            </div>
+                            <div class="form-group">
+                                <label>Balance Amount</label>
+                                <input type="number" id="billBalance" readonly placeholder="Auto-calculated">
+                            </div>
+                            <div class="form-group">
+                                <label>Driver Batta (Per day) *</label>
+                                <input type="number" id="billDriverBatta" required placeholder="Driver allowance" step="0.01" value="0" oninput="calculateBillTotal()">
+                            </div>
+                            <div class="form-group">
+                                <label>Extra Charges</label>
+                                <input type="number" id="billExtraCharges" placeholder="Additional charges (optional)" step="0.01" value="0" oninput="calculateBillTotal()">
+                            </div>
+                            <div class="form-group md:col-span-2">
+                                <label style="font-weight: 700; font-size: 1.1rem; color: #1e40af;">Grand Total</label>
+                                <input type="number" id="billGrandTotal" readonly style="font-weight: 700; font-size: 1.3rem; color: #1e40af; background: #dbeafe;" placeholder="Auto-calculated grand total">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Terms & Notes Section -->
+                    <div class="mb-6">
+                        <h4 class="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">Terms & Additional Notes</h4>
+                        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+                            <p class="text-sm text-gray-700 font-semibold mb-2">Important Terms:</p>
+                            <ul class="text-sm text-gray-600 space-y-1 ml-4">
+                                <li>• Parking, Tollgates, Check Post, R.T.O, and State Taxes will be paid by the party</li>
+                                <li>• Hyderabad entrance tax paid by party only</li>
+                            </ul>
+                        </div>
+                        <div class="form-group">
+                            <label>Route Details / Remarks</label>
+                            <textarea id="billRouteDetails" rows="4" placeholder="Enter route details or additional remarks"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" onclick="closeBillModal()" class="btn-secondary">Cancel</button>
+                        <button type="submit" class="btn-primary">Save Bill</button>
+                        <button type="button" onclick="saveAndEmailBill()" class="btn-primary" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                            📧 Save & Email to Customer
+                        </button>
                     </div>
                 </form>
             </div>

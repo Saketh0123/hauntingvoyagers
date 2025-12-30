@@ -2,6 +2,9 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
+const nodemailer = require('nodemailer');
+const puppeteer = require('puppeteer-core');
+const chromium = require('chrome-aws-lambda');
 require('dotenv').config();
 
 const Tour = require('./tourModel');
@@ -10,6 +13,7 @@ const Travell = require('./travellModel');
 const HeroImage = require('./heroImageModel');
 const Booking = require('./bookingModel');
 const PricingCard = require('./pricingModel');
+const Bill = require('./billModel');
 const { uploadImage, uploadMultipleImages } = require('./cloudinary');
 
 const app = express();
@@ -496,6 +500,480 @@ app.delete('/api/pricing/:id', async (req, res) => {
     if (!card) return res.status(404).json({ error: 'Pricing card not found' });
     res.json({ message: 'Pricing card deleted successfully' });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
+// BILL MANAGEMENT ROUTES
+// ============================================
+
+// Get all bills
+app.get('/api/bills', async (req, res) => {
+  try {
+    const bills = await Bill.find().sort({ createdAt: -1 });
+    res.json(bills);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get single bill by ID
+app.get('/api/bills/:id', async (req, res) => {
+  try {
+    const bill = await Bill.findById(req.params.id);
+    if (!bill) return res.status(404).json({ error: 'Bill not found' });
+    res.json(bill);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create new bill
+app.post('/api/bills', async (req, res) => {
+  try {
+    const bill = new Bill(req.body);
+    await bill.save();
+    res.status(201).json(bill);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Update bill
+app.put('/api/bills/:id', async (req, res) => {
+  try {
+    const bill = await Bill.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    if (!bill) return res.status(404).json({ error: 'Bill not found' });
+    res.json(bill);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Delete bill
+app.delete('/api/bills/:id', async (req, res) => {
+  try {
+    const bill = await Bill.findByIdAndDelete(req.params.id);
+    if (!bill) return res.status(404).json({ error: 'Bill not found' });
+    res.json({ message: 'Bill deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Generate PDF and send email for bill
+app.post('/api/bills/:id/send-email', async (req, res) => {
+  try {
+    const bill = await Bill.findById(req.params.id);
+    if (!bill) return res.status(404).json({ error: 'Bill not found' });
+
+    // Generate HTML for invoice (matching exact viewBill styling)
+    const invoiceHTML = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>Bill - ${bill.billNo}</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+          font-family: Arial, sans-serif; 
+          padding: 20px 30px; 
+          max-width: 210mm;
+          margin: 0 auto;
+          font-size: 12px;
+          line-height: 1.4;
+        }
+        
+        /* Header Section */
+        .company-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 15px;
+          padding-bottom: 15px;
+          border-bottom: 3px double #333;
+        }
+        .company-left { flex: 1; }
+        .company-center { flex: 2; text-align: center; padding: 0 20px; }
+        .company-right { flex: 1; text-align: right; }
+        .company-name {
+          font-size: 20px;
+          font-weight: bold;
+          color: #1e40af;
+          margin-bottom: 5px;
+          letter-spacing: 1px;
+        }
+        .bus-icon {
+          font-size: 24px;
+          color: #ea580c;
+          margin-bottom: 5px;
+        }
+        .company-info {
+          font-size: 10px;
+          color: #444;
+          line-height: 1.6;
+        }
+        .contact-numbers {
+          font-size: 11px;
+          font-weight: 600;
+          color: #333;
+          line-height: 1.8;
+        }
+        
+        /* Bill Header */
+        .bill-header {
+          text-align: center;
+          margin: 15px 0;
+          padding: 8px;
+          background: linear-gradient(to right, #dbeafe, #fce7f3);
+          border-radius: 5px;
+        }
+        .bill-header h2 {
+          font-size: 16px;
+          color: #1e40af;
+          margin-bottom: 5px;
+        }
+        .bill-info {
+          font-size: 11px;
+          color: #555;
+        }
+        
+        /* Content Sections */
+        .section {
+          margin: 12px 0;
+        }
+        .section-title {
+          font-size: 13px;
+          font-weight: bold;
+          color: #1e40af;
+          border-bottom: 2px solid #ddd;
+          padding-bottom: 4px;
+          margin-bottom: 8px;
+        }
+        .row {
+          display: flex;
+          gap: 15px;
+          margin: 6px 0;
+        }
+        .col {
+          flex: 1;
+        }
+        .field-label {
+          font-weight: 600;
+          color: #555;
+          font-size: 11px;
+        }
+        .field-value {
+          color: #000;
+          margin-top: 2px;
+          font-size: 11px;
+        }
+        
+        /* Billing Summary */
+        .billing-summary {
+          background: #f0f9ff;
+          padding: 12px;
+          margin: 12px 0;
+          border: 2px solid #1e40af;
+          border-radius: 5px;
+        }
+        .summary-row {
+          display: flex;
+          justify-content: space-between;
+          margin: 5px 0;
+          font-size: 11px;
+        }
+        .summary-label {
+          font-weight: 600;
+          color: #555;
+        }
+        .summary-value {
+          font-weight: 600;
+          color: #000;
+        }
+        .grand-total-row {
+          margin-top: 10px;
+          padding-top: 10px;
+          border-top: 2px solid #1e40af;
+          font-size: 14px;
+        }
+        .grand-total-row .summary-label,
+        .grand-total-row .summary-value {
+          font-weight: bold;
+          color: #1e40af;
+        }
+        .amount-words {
+          margin-top: 8px;
+          font-size: 10px;
+          font-style: italic;
+          color: #666;
+          text-align: center;
+        }
+        
+        /* Terms */
+        .terms {
+          background: #fffbeb;
+          padding: 10px;
+          margin: 12px 0;
+          border-left: 4px solid #f59e0b;
+          font-size: 10px;
+        }
+        .terms strong {
+          color: #b45309;
+          display: block;
+          margin-bottom: 5px;
+        }
+        .terms ul {
+          margin-left: 15px;
+          line-height: 1.6;
+        }
+        
+        /* Footer */
+        .footer {
+          text-align: center;
+          margin-top: 15px;
+          padding-top: 10px;
+          border-top: 2px solid #ddd;
+          font-size: 11px;
+          color: #666;
+        }
+        
+        /* Print Styles */
+        @media print {
+          body { 
+            padding: 15px 20px;
+            font-size: 11px;
+          }
+          .company-name { font-size: 18px; }
+          .bill-header h2 { font-size: 15px; }
+          @page {
+            size: A4;
+            margin: 10mm;
+          }
+        }
+      </style>
+    </head>
+    <body>
+      <!-- Company Header -->
+      <div class="company-header">
+        <div class="company-left">
+          <div class="company-info">
+            <strong>Prop:</strong> P. Kiran Kumar
+          </div>
+        </div>
+        
+        <div class="company-center">
+          <div class="bus-icon">🚌</div>
+          <div class="company-name">PAVAN KRISHNA TRAVELS (GOUD)</div>
+          <div class="company-info">
+            Shop No. 3-3-158/1, Enugulagadda, Chowrastha, HANAMKONDA
+          </div>
+        </div>
+        
+        <div class="company-right">
+          <div class="contact-numbers">
+            <div>Cell: 98494 58582</div>
+            <div>98499 44429</div>
+            <div>98496 58850</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Bill Header -->
+      <div class="bill-header">
+        <h2>TRAVEL BILL</h2>
+        <div class="bill-info">
+          Bill No: <strong>${bill.billNo}</strong> | Date: <strong>${new Date(bill.date).toLocaleDateString('en-IN')}</strong>
+        </div>
+      </div>
+      
+      <!-- Customer Details -->
+      <div class="section">
+        <div class="section-title">Customer Details</div>
+        <div class="row">
+          <div class="col">
+            <div class="field-label">Name:</div>
+            <div class="field-value">${bill.customerName}</div>
+          </div>
+          <div class="col">
+            <div class="field-label">Contact:</div>
+            <div class="field-value">${bill.contactNo}</div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <div class="field-label">Address:</div>
+            <div class="field-value">${bill.address}</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Vehicle & Travel Details -->
+      <div class="section">
+        <div class="section-title">Vehicle & Travel Details</div>
+        <div class="row">
+          <div class="col">
+            <div class="field-label">Vehicle No:</div>
+            <div class="field-value">${bill.vehicleNo}</div>
+          </div>
+          <div class="col">
+            <div class="field-label">Seats:</div>
+            <div class="field-value">${bill.seats}</div>
+          </div>
+          <div class="col">
+            <div class="field-label">Destination:</div>
+            <div class="field-value">${bill.destination}</div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <div class="field-label">From:</div>
+            <div class="field-value">${new Date(bill.dateFrom).toLocaleDateString('en-IN')}</div>
+          </div>
+          <div class="col">
+            <div class="field-label">To:</div>
+            <div class="field-value">${new Date(bill.dateTo).toLocaleDateString('en-IN')}</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Billing Summary -->
+      <div class="billing-summary">
+        <div class="section-title" style="border: none; margin-bottom: 10px;">Billing Summary</div>
+        <div class="summary-row">
+          <span class="summary-label">Rate per KM:</span>
+          <span class="summary-value">₹${bill.ratePerKm}</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Total Amount:</span>
+          <span class="summary-value">₹${parseFloat(bill.totalAmount).toLocaleString('en-IN')}</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Advance Paid:</span>
+          <span class="summary-value">₹${parseFloat(bill.advance).toLocaleString('en-IN')}</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Balance:</span>
+          <span class="summary-value">₹${(parseFloat(bill.totalAmount) - parseFloat(bill.advance)).toLocaleString('en-IN')}</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Driver Batta:</span>
+          <span class="summary-value">₹${parseFloat(bill.driverBatta).toLocaleString('en-IN')}</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Extra Charges:</span>
+          <span class="summary-value">₹${parseFloat(bill.extraCharges || 0).toLocaleString('en-IN')}</span>
+        </div>
+        <div class="summary-row grand-total-row">
+          <span class="summary-label">Grand Total:</span>
+          <span class="summary-value">₹${parseFloat(bill.grandTotal).toLocaleString('en-IN')}</span>
+        </div>
+        <div class="amount-words">${bill.amountWords}</div>
+      </div>
+      
+      <!-- Terms -->
+      <div class="terms">
+        <strong>Important Terms:</strong>
+        <ul>
+          <li>Parking, Tollgates, Check Post, R.T.O, and State Taxes will be paid by the party</li>
+          <li>Hyderabad entrance tax paid by party only</li>
+        </ul>
+      </div>
+      
+      ${bill.routeDetails ? `
+      <div class="section">
+        <div class="section-title">Route Details / Remarks</div>
+        <div class="field-value">${bill.routeDetails}</div>
+      </div>
+      ` : ''}
+      
+      <!-- Footer -->
+      <div class="footer">
+        <p><strong>Thank you for choosing PAVAN KRISHNA TRAVELS!</strong></p>
+        <p>For any queries, please contact us at the numbers mentioned above.</p>
+      </div>
+    </body>
+    </html>
+    `;
+
+    // Generate PDF using puppeteer
+    let browser;
+    try {
+      browser = await puppeteer.launch({
+        args: chromium.args,
+        defaultViewport: chromium.defaultViewport,
+        executablePath: await chromium.executablePath || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+        headless: chromium.headless || true,
+      });
+
+      const page = await browser.newPage();
+      await page.setContent(invoiceHTML, { waitUntil: 'networkidle0' });
+      
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' }
+      });
+
+      await browser.close();
+
+      // Setup nodemailer transporter
+      const transporter = nodemailer.createTransport({
+        host: 'smtp.gmail.com',
+        port: 587,
+        secure: false,
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS
+        }
+      });
+
+      // Send email with PDF attachment
+      const mailOptions = {
+        from: `"PAVAN KRISHNA TRAVELS" <${process.env.EMAIL_USER}>`,
+        to: bill.customerEmail,
+        subject: `Bill ${bill.billNo} - PAVAN KRISHNA TRAVELS`,
+        text: `Dear ${bill.customerName},\n\nThank you for choosing PAVAN KRISHNA TRAVELS.\n\nPlease find attached your bill for the journey to ${bill.destination}.\n\nBill Number: ${bill.billNo}\nGrand Total: ₹${bill.grandTotal}\n\nFor any queries, please contact us at:\n98494 58582 | 98499 44429 | 98496 58850\n\nBest Regards,\nPAVAN KRISHNA TRAVELS`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #1e40af;">🚌 PAVAN KRISHNA TRAVELS</h2>
+            <p>Dear <strong>${bill.customerName}</strong>,</p>
+            <p>Thank you for choosing PAVAN KRISHNA TRAVELS.</p>
+            <p>Please find attached your bill for the journey to <strong>${bill.destination}</strong>.</p>
+            <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <p style="margin: 5px 0;"><strong>Bill Number:</strong> ${bill.billNo}</p>
+              <p style="margin: 5px 0;"><strong>Grand Total:</strong> ₹${bill.grandTotal}</p>
+            </div>
+            <p>For any queries, please contact us at:</p>
+            <p><strong>98494 58582 | 98499 44429 | 98496 58850</strong></p>
+            <p style="margin-top: 30px;">Best Regards,<br><strong>PAVAN KRISHNA TRAVELS</strong></p>
+          </div>
+        `,
+        attachments: [
+          {
+            filename: `Bill_${bill.billNo}.pdf`,
+            content: pdfBuffer,
+            contentType: 'application/pdf'
+          }
+        ]
+      };
+
+      await transporter.sendMail(mailOptions);
+
+      res.json({ 
+        success: true, 
+        message: `Bill sent successfully to ${bill.customerEmail}` 
+      });
+
+    } catch (pdfError) {
+      if (browser) await browser.close();
+      throw pdfError;
+    }
+
+  } catch (error) {
+    console.error('Email sending error:', error);
     res.status(500).json({ error: error.message });
   }
 });

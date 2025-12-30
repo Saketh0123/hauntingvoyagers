@@ -242,9 +242,9 @@ document.addEventListener('DOMContentLoaded', function() {
         additionalGalleryFile.addEventListener('change', handleAdditionalGalleryUpload);
     }
     
-    // Add date validation listener for dynamically created date inputs
+    // Add date validation listener only for tour start-date fields
     document.addEventListener('change', function(e) {
-        if (e.target.classList.contains('start-date') || e.target.type === 'date') {
+        if (e.target.classList.contains('start-date')) {
             const today = new Date().toISOString().split('T')[0];
             if (e.target.value && e.target.value < today) {
                 alert('Cannot select past dates. Please choose today or a future date.');
@@ -305,6 +305,7 @@ function showView(viewName) {
         'tours': 'Tours Management',
         'travells': 'Vehicle Rentals Management',
         'bookings': 'Booking Requests',
+        'bills': 'Bill Management',
         'dates': 'Available Dates Management',
         'pricing': 'Tour Pricing Overview',
         'duration': 'Tour Durations'
@@ -332,6 +333,9 @@ function showView(viewName) {
     } else if (viewName === 'bookings') {
         document.getElementById('bookingsView').classList.remove('hidden');
         loadBookings();
+    } else if (viewName === 'bills') {
+        document.getElementById('billsView').classList.remove('hidden');
+        loadBills();
     } else if (viewName === 'dates') {
         document.getElementById('datesView').classList.remove('hidden');
         loadDatesView();
@@ -2206,3 +2210,777 @@ async function saveHeroContent() {
     }
 }
 
+
+// ============================================
+// BILL MANAGEMENT FUNCTIONS
+// ============================================
+
+let allBills = [];
+let editingBillId = null;
+
+// Load bills
+async function loadBills() {
+    try {
+        const response = await fetch(`${API_URL}/bills`);
+        if (response.ok) {
+            allBills = await response.json();
+            displayBills();
+            
+            // Set max date to today for billing date filter
+            const today = new Date().toISOString().split('T')[0];
+            const billFilterDateInput = document.getElementById('billFilterDate');
+            if (billFilterDateInput) billFilterDateInput.setAttribute('max', today);
+        }
+    } catch (error) {
+        console.error('Error loading bills:', error);
+    }
+}
+
+// Display bills in table
+function displayBills() {
+    const tbody = document.getElementById('billsTableBody');
+    if (!tbody) return;
+
+    if (allBills.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-gray-500">No bills created yet</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = allBills.map((bill, index) => `
+        <tr>
+            <td><strong>#${index + 1}</strong></td>
+            <td>${new Date(bill.date).toLocaleDateString()}</td>
+            <td>${bill.customerName}</td>
+            <td>${bill.contactNo}</td>
+            <td>${bill.vehicleNo}</td>
+            <td><strong style="color: #1e40af;">₹${parseFloat(bill.grandTotal).toLocaleString()}</strong></td>
+            <td>
+                <button onclick="editBill('${bill._id}')" class="btn-edit">Edit</button>
+                <button onclick="viewBill('${bill._id}')" class="btn-primary" style="margin-left: 5px;">View</button>
+                <button onclick="deleteBill('${bill._id}')" class="btn-delete">Delete</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+// Open bill modal
+function openBillModal() {
+    editingBillId = null;
+    document.getElementById('billModalTitle').textContent = 'Create New Bill';
+    document.getElementById('billForm').reset();
+    
+    // Generate serial number based on current bills count
+    const serialNo = allBills.length + 1;
+    document.getElementById('billNo').value = serialNo;
+    
+    // Set today's date
+    const today = new Date().toISOString().split('T')[0];
+    const billDateInput = document.getElementById('billDate');
+    billDateInput.value = today;
+    
+    document.getElementById('billModal').classList.add('active');
+}
+
+// Filter bills based on search criteria
+function filterBills() {
+    const searchNumber = document.getElementById('billSearchInput').value.trim();
+    const selectedDate = document.getElementById('billFilterDate').value;
+    
+    const tbody = document.getElementById('billsTableBody');
+    if (!tbody) return;
+    
+    let filteredBills = [...allBills];
+    
+    // Filter by bill number (serial number)
+    if (searchNumber) {
+        const searchIndex = parseInt(searchNumber) - 1; // Convert to 0-based index
+        if (searchIndex >= 0 && searchIndex < allBills.length) {
+            filteredBills = [allBills[searchIndex]];
+        } else {
+            filteredBills = [];
+        }
+    }
+    
+    // Filter by specific date
+    if (selectedDate) {
+        const filterDate = new Date(selectedDate);
+        filterDate.setHours(0, 0, 0, 0);
+        filteredBills = filteredBills.filter(bill => {
+            const billDate = new Date(bill.date);
+            billDate.setHours(0, 0, 0, 0);
+            return billDate.getTime() === filterDate.getTime();
+        });
+    }
+    
+    // Display filtered results
+    if (filteredBills.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-gray-500">No bills found matching the criteria</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = filteredBills.map((bill) => {
+        const originalIndex = allBills.findIndex(b => b._id === bill._id);
+        return `
+        <tr>
+            <td><strong>#${originalIndex + 1}</strong></td>
+            <td>${new Date(bill.date).toLocaleDateString()}</td>
+            <td>${bill.customerName}</td>
+            <td>${bill.contactNo}</td>
+            <td>${bill.vehicleNo}</td>
+            <td><strong style="color: #1e40af;">₹${parseFloat(bill.grandTotal).toLocaleString()}</strong></td>
+            <td>
+                <button onclick="editBill('${bill._id}')" class="btn-edit">Edit</button>
+                <button onclick="viewBill('${bill._id}')" class="btn-primary" style="margin-left: 5px;">View</button>
+                <button onclick="deleteBill('${bill._id}')" class="btn-delete">Delete</button>
+            </td>
+        </tr>
+        `;
+    }).join('');
+}
+
+// Clear all bill filters
+function clearBillFilters() {
+    document.getElementById('billSearchInput').value = '';
+    document.getElementById('billFilterDate').value = '';
+    displayBills();
+}
+
+// Close bill modal
+function closeBillModal() {
+    document.getElementById('billModal').classList.remove('active');
+    editingBillId = null;
+}
+
+// Calculate bill total
+function calculateBillTotal() {
+    const totalAmount = parseFloat(document.getElementById('billTotalAmount').value) || 0;
+    const advance = parseFloat(document.getElementById('billAdvance').value) || 0;
+    const driverBatta = parseFloat(document.getElementById('billDriverBatta').value) || 0;
+    const extraCharges = parseFloat(document.getElementById('billExtraCharges').value) || 0;
+    
+    // Calculate balance
+    const balance = totalAmount - advance;
+    document.getElementById('billBalance').value = balance.toFixed(2);
+    
+    // Calculate grand total
+    const grandTotal = totalAmount + driverBatta + extraCharges;
+    document.getElementById('billGrandTotal').value = grandTotal.toFixed(2);
+    
+    // Convert amount to words
+    document.getElementById('billAmountWords').value = numberToWords(grandTotal);
+}
+
+// Convert number to words (Indian rupees)
+function numberToWords(num) {
+    if (num === 0) return 'Zero Rupees';
+    
+    const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+    const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+    const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    
+    function convertLessThanThousand(n) {
+        if (n === 0) return '';
+        if (n < 10) return ones[n];
+        if (n < 20) return teens[n - 10];
+        if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 ? ' ' + ones[n % 10] : '');
+        return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 ? ' ' + convertLessThanThousand(n % 100) : '');
+    }
+    
+    const crore = Math.floor(num / 10000000);
+    num %= 10000000;
+    const lakh = Math.floor(num / 100000);
+    num %= 100000;
+    const thousand = Math.floor(num / 1000);
+    num %= 1000;
+    const remainder = num;
+    
+    let words = '';
+    if (crore) words += convertLessThanThousand(crore) + ' Crore ';
+    if (lakh) words += convertLessThanThousand(lakh) + ' Lakh ';
+    if (thousand) words += convertLessThanThousand(thousand) + ' Thousand ';
+    if (remainder) words += convertLessThanThousand(remainder);
+    
+    return words.trim() + ' Rupees Only';
+}
+
+// Edit bill
+function editBill(billId) {
+    const bill = allBills.find(b => b._id === billId);
+    if (!bill) return;
+    
+    editingBillId = billId;
+    document.getElementById('billModalTitle').textContent = 'Edit Bill';
+    
+    // Fill form
+    document.getElementById('billNo').value = bill.billNo;
+    document.getElementById('billDate').value = bill.date.split('T')[0];
+    document.getElementById('billSeats').value = bill.seats;
+    document.getElementById('billVehicleNo').value = bill.vehicleNo;
+    document.getElementById('billCustomerName').value = bill.customerName;
+    document.getElementById('billContactNo').value = bill.contactNo;
+    document.getElementById('billCustomerEmail').value = bill.customerEmail || '';
+    document.getElementById('billAddress').value = bill.address;
+    document.getElementById('billDestination').value = bill.destination;
+    document.getElementById('billDateFrom').value = bill.dateFrom.split('T')[0];
+    document.getElementById('billDateTo').value = bill.dateTo.split('T')[0];
+    document.getElementById('billRatePerKm').value = bill.ratePerKm;
+    document.getElementById('billTotalAmount').value = bill.totalAmount;
+    document.getElementById('billAdvance').value = bill.advance;
+    document.getElementById('billDriverBatta').value = bill.driverBatta;
+    document.getElementById('billExtraCharges').value = bill.extraCharges || 0;
+    document.getElementById('billRouteDetails').value = bill.routeDetails || '';
+    
+    calculateBillTotal();
+    document.getElementById('billModal').classList.add('active');
+}
+
+// View bill (for printing/preview)
+function viewBill(billId) {
+    const bill = allBills.find(b => b._id === billId);
+    if (!bill) return;
+    
+    // Create a printable view
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Bill - ${bill.billNo}</title>
+            <style>
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body { 
+                    font-family: Arial, sans-serif; 
+                    padding: 20px 30px; 
+                    max-width: 210mm;
+                    margin: 0 auto;
+                    font-size: 12px;
+                    line-height: 1.4;
+                }
+                
+                /* Header Section */
+                .company-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    margin-bottom: 15px;
+                    padding-bottom: 15px;
+                    border-bottom: 3px double #333;
+                }
+                .company-left {
+                    flex: 1;
+                }
+                .company-center {
+                    flex: 2;
+                    text-align: center;
+                    padding: 0 20px;
+                }
+                .company-right {
+                    flex: 1;
+                    text-align: right;
+                }
+                .company-name {
+                    font-size: 20px;
+                    font-weight: bold;
+                    color: #1e40af;
+                    margin-bottom: 5px;
+                    letter-spacing: 1px;
+                }
+                .bus-icon {
+                    font-size: 24px;
+                    color: #ea580c;
+                    margin-bottom: 5px;
+                }
+                .company-info {
+                    font-size: 10px;
+                    color: #444;
+                    line-height: 1.6;
+                }
+                .contact-numbers {
+                    font-size: 11px;
+                    font-weight: 600;
+                    color: #333;
+                    line-height: 1.8;
+                }
+                
+                /* Bill Header */
+                .bill-header {
+                    text-align: center;
+                    margin: 15px 0;
+                    padding: 8px;
+                    background: linear-gradient(to right, #dbeafe, #fce7f3);
+                    border-radius: 5px;
+                }
+                .bill-header h2 {
+                    font-size: 16px;
+                    color: #1e40af;
+                    margin-bottom: 5px;
+                }
+                .bill-info {
+                    font-size: 11px;
+                    color: #555;
+                }
+                
+                /* Content Sections */
+                .section {
+                    margin: 12px 0;
+                }
+                .section-title {
+                    font-size: 13px;
+                    font-weight: bold;
+                    color: #1e40af;
+                    border-bottom: 2px solid #ddd;
+                    padding-bottom: 4px;
+                    margin-bottom: 8px;
+                }
+                .row {
+                    display: flex;
+                    gap: 15px;
+                    margin: 6px 0;
+                }
+                .col {
+                    flex: 1;
+                }
+                .field-label {
+                    font-weight: 600;
+                    color: #555;
+                    font-size: 11px;
+                }
+                .field-value {
+                    color: #000;
+                    margin-top: 2px;
+                    font-size: 11px;
+                }
+                
+                /* Billing Summary */
+                .billing-summary {
+                    background: #f0f9ff;
+                    padding: 12px;
+                    margin: 12px 0;
+                    border: 2px solid #1e40af;
+                    border-radius: 5px;
+                }
+                .summary-row {
+                    display: flex;
+                    justify-content: space-between;
+                    margin: 5px 0;
+                    font-size: 11px;
+                }
+                .summary-label {
+                    font-weight: 600;
+                    color: #555;
+                }
+                .summary-value {
+                    font-weight: 600;
+                    color: #000;
+                }
+                .grand-total-row {
+                    margin-top: 10px;
+                    padding-top: 10px;
+                    border-top: 2px solid #1e40af;
+                    font-size: 14px;
+                }
+                .grand-total-row .summary-label,
+                .grand-total-row .summary-value {
+                    font-weight: bold;
+                    color: #1e40af;
+                }
+                .amount-words {
+                    margin-top: 8px;
+                    font-size: 10px;
+                    font-style: italic;
+                    color: #666;
+                    text-align: center;
+                }
+                
+                /* Terms */
+                .terms {
+                    background: #fffbeb;
+                    padding: 10px;
+                    margin: 12px 0;
+                    border-left: 4px solid #f59e0b;
+                    font-size: 10px;
+                }
+                .terms strong {
+                    color: #b45309;
+                    display: block;
+                    margin-bottom: 5px;
+                }
+                .terms ul {
+                    margin-left: 15px;
+                    line-height: 1.6;
+                }
+                
+                /* Footer */
+                .footer {
+                    text-align: center;
+                    margin-top: 15px;
+                    padding-top: 10px;
+                    border-top: 2px solid #ddd;
+                    font-size: 11px;
+                    color: #666;
+                }
+                
+                /* Print Styles */
+                @media print {
+                    body { 
+                        padding: 15px 20px;
+                        font-size: 11px;
+                    }
+                    .company-name { font-size: 18px; }
+                    .bill-header h2 { font-size: 15px; }
+                    @page {
+                        size: A4;
+                        margin: 10mm;
+                    }
+                }
+            </style>
+        </head>
+        <body>
+            <!-- Company Header -->
+            <div class="company-header">
+                <div class="company-left">
+                    <div class="company-info">
+                        <strong>Prop:</strong> P. Kiran Kumar
+                    </div>
+                </div>
+                
+                <div class="company-center">
+                    <div class="bus-icon">🚌</div>
+                    <div class="company-name">PAVAN KRISHNA TRAVELS (GOUD)</div>
+                    <div class="company-info">
+                        Shop No. 3-3-158/1, Enugulagadda, Chowrastha, HANAMKONDA
+                    </div>
+                </div>
+                
+                <div class="company-right">
+                    <div class="contact-numbers">
+                        <div>Cell: 98494 58582</div>
+                        <div>98499 44429</div>
+                        <div>98496 58850</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Bill Header -->
+            <div class="bill-header">
+                <h2>TRAVEL BILL</h2>
+                <div class="bill-info">
+                    Bill No: <strong>${bill.billNo}</strong> | Date: <strong>${new Date(bill.date).toLocaleDateString('en-IN')}</strong>
+                </div>
+            </div>
+            
+            <!-- Customer Details -->
+            <div class="section">
+                <div class="section-title">Customer Details</div>
+                <div class="row">
+                    <div class="col">
+                        <div class="field-label">Name:</div>
+                        <div class="field-value">${bill.customerName}</div>
+                    </div>
+                    <div class="col">
+                        <div class="field-label">Contact:</div>
+                        <div class="field-value">${bill.contactNo}</div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col">
+                        <div class="field-label">Address:</div>
+                        <div class="field-value">${bill.address}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Vehicle & Travel Details -->
+            <div class="section">
+                <div class="section-title">Vehicle & Travel Details</div>
+                <div class="row">
+                    <div class="col">
+                        <div class="field-label">Vehicle No:</div>
+                        <div class="field-value">${bill.vehicleNo}</div>
+                    </div>
+                    <div class="col">
+                        <div class="field-label">Seats:</div>
+                        <div class="field-value">${bill.seats}</div>
+                    </div>
+                    <div class="col">
+                        <div class="field-label">Destination:</div>
+                        <div class="field-value">${bill.destination}</div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col">
+                        <div class="field-label">From:</div>
+                        <div class="field-value">${new Date(bill.dateFrom).toLocaleDateString('en-IN')} ${bill.timeFrom}</div>
+                    </div>
+                    <div class="col">
+                        <div class="field-label">To:</div>
+                        <div class="field-value">${new Date(bill.dateTo).toLocaleDateString('en-IN')} ${bill.timeTo}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Billing Summary -->
+            <div class="billing-summary">
+                <div class="section-title" style="border: none; margin-bottom: 10px;">Billing Summary</div>
+                <div class="summary-row">
+                    <span class="summary-label">Rate per KM:</span>
+                    <span class="summary-value">₹${bill.ratePerKm}</span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Total Amount:</span>
+                    <span class="summary-value">₹${parseFloat(bill.totalAmount).toLocaleString('en-IN')}</span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Advance Paid:</span>
+                    <span class="summary-value">₹${parseFloat(bill.advance).toLocaleString('en-IN')}</span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Balance:</span>
+                    <span class="summary-value">₹${(parseFloat(bill.totalAmount) - parseFloat(bill.advance)).toLocaleString('en-IN')}</span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Driver Batta:</span>
+                    <span class="summary-value">₹${parseFloat(bill.driverBatta).toLocaleString('en-IN')}</span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Extra Charges:</span>
+                    <span class="summary-value">₹${parseFloat(bill.extraCharges || 0).toLocaleString('en-IN')}</span>
+                </div>
+                <div class="summary-row grand-total-row">
+                    <span class="summary-label">Grand Total:</span>
+                    <span class="summary-value">₹${parseFloat(bill.grandTotal).toLocaleString('en-IN')}</span>
+                </div>
+                <div class="amount-words">${bill.amountWords}</div>
+            </div>
+            
+            <!-- Terms -->
+            <div class="terms">
+                <strong>Important Terms:</strong>
+                <ul>
+                    <li>Parking, Tollgates, Check Post, R.T.O, and State Taxes will be paid by the party</li>
+                    <li>Hyderabad entrance tax paid by party only</li>
+                </ul>
+            </div>
+            
+            ${bill.routeDetails ? `
+            <div class="section">
+                <div class="section-title">Route Details / Remarks</div>
+                <div class="field-value">${bill.routeDetails}</div>
+            </div>
+            ` : ''}
+            
+            <!-- Footer -->
+            <div class="footer">
+                <p><strong>Thank you for choosing PAVAN KRISHNA TRAVELS!</strong></p>
+                <p>For any queries, please contact us at the numbers mentioned above.</p>
+            </div>
+            
+            <script>
+                window.onload = function() { 
+                    setTimeout(() => window.print(), 500);
+                }
+            </script>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+}
+
+// Delete bill
+async function deleteBill(billId) {
+    if (!confirm('Are you sure you want to delete this bill?')) return;
+    
+    try {
+        const response = await fetch(`${API_URL}/bills/${billId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            alert('Bill deleted successfully!');
+            loadBills();
+        } else {
+            throw new Error('Failed to delete bill');
+        }
+    } catch (error) {
+        console.error('Error deleting bill:', error);
+        alert('Error deleting bill');
+    }
+}
+
+// Email existing bill function
+async function emailBill(billId) {
+    const bill = allBills.find(b => b._id === billId);
+    if (!bill) return;
+    
+    if (!bill.customerEmail) {
+        alert('This bill does not have a customer email. Please edit the bill and add an email address.');
+        return;
+    }
+    
+    const confirmSend = confirm(`Send bill ${bill.billNo} to ${bill.customerEmail}?`);
+    if (!confirmSend) return;
+    
+    try {
+        alert('Sending email... Please wait.');
+        
+        const response = await fetch(`${API_URL}/bills/${billId}/send-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            alert(`✅ ${result.message}`);
+        } else {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to send email');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert(`Error: ${error.message}`);
+    }
+}
+
+// Handle bill form submission
+document.getElementById('billForm')?.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const billData = {
+        billNo: document.getElementById('billNo').value,
+        date: document.getElementById('billDate').value,
+        seats: parseInt(document.getElementById('billSeats').value),
+        vehicleNo: document.getElementById('billVehicleNo').value,
+        customerName: document.getElementById('billCustomerName').value,
+        contactNo: document.getElementById('billContactNo').value,
+        customerEmail: document.getElementById('billCustomerEmail').value,
+        address: document.getElementById('billAddress').value,
+        destination: document.getElementById('billDestination').value,
+        dateFrom: document.getElementById('billDateFrom').value,
+        dateTo: document.getElementById('billDateTo').value,
+        ratePerKm: parseFloat(document.getElementById('billRatePerKm').value),
+        totalAmount: parseFloat(document.getElementById('billTotalAmount').value),
+        amountWords: document.getElementById('billAmountWords').value,
+        advance: parseFloat(document.getElementById('billAdvance').value),
+        balance: parseFloat(document.getElementById('billBalance').value),
+        driverBatta: parseFloat(document.getElementById('billDriverBatta').value),
+        extraCharges: parseFloat(document.getElementById('billExtraCharges').value) || 0,
+        grandTotal: parseFloat(document.getElementById('billGrandTotal').value),
+        routeDetails: document.getElementById('billRouteDetails').value
+    };
+    
+    try {
+        let response;
+        if (editingBillId) {
+            response = await fetch(`${API_URL}/bills/${editingBillId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(billData)
+            });
+        } else {
+            response = await fetch(`${API_URL}/bills`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(billData)
+            });
+        }
+        
+        if (response.ok) {
+            alert(editingBillId ? 'Bill updated successfully!' : 'Bill created successfully!');
+            closeBillModal();
+            loadBills();
+        } else {
+            throw new Error('Failed to save bill');
+        }
+    } catch (error) {
+        console.error('Error saving bill:', error);
+        alert('Error saving bill');
+    }
+});
+
+// Save and email bill function
+async function saveAndEmailBill() {
+    const billCustomerEmail = document.getElementById('billCustomerEmail').value;
+    
+    if (!billCustomerEmail || !billCustomerEmail.includes('@')) {
+        alert('Please enter a valid customer email address');
+        return;
+    }
+    
+    const confirmSend = confirm(`Send bill to ${billCustomerEmail}?`);
+    if (!confirmSend) return;
+    
+    // First save the bill
+    const billData = {
+        billNo: document.getElementById('billNo').value,
+        date: document.getElementById('billDate').value,
+        seats: parseInt(document.getElementById('billSeats').value),
+        vehicleNo: document.getElementById('billVehicleNo').value,
+        customerName: document.getElementById('billCustomerName').value,
+        contactNo: document.getElementById('billContactNo').value,
+        customerEmail: billCustomerEmail,
+        address: document.getElementById('billAddress').value,
+        destination: document.getElementById('billDestination').value,
+        dateFrom: document.getElementById('billDateFrom').value,
+        dateTo: document.getElementById('billDateTo').value,
+        ratePerKm: parseFloat(document.getElementById('billRatePerKm').value),
+        totalAmount: parseFloat(document.getElementById('billTotalAmount').value),
+        amountWords: document.getElementById('billAmountWords').value,
+        advance: parseFloat(document.getElementById('billAdvance').value),
+        balance: parseFloat(document.getElementById('billBalance').value),
+        driverBatta: parseFloat(document.getElementById('billDriverBatta').value),
+        extraCharges: parseFloat(document.getElementById('billExtraCharges').value) || 0,
+        grandTotal: parseFloat(document.getElementById('billGrandTotal').value),
+        routeDetails: document.getElementById('billRouteDetails').value
+    };
+    
+    try {
+        // Save or update bill
+        let response;
+        let billId = editingBillId;
+        
+        if (editingBillId) {
+            response = await fetch(`${API_URL}/bills/${editingBillId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(billData)
+            });
+        } else {
+            response = await fetch(`${API_URL}/bills`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(billData)
+            });
+            
+            if (response.ok) {
+                const savedBill = await response.json();
+                billId = savedBill._id;
+            }
+        }
+        
+        if (!response.ok) {
+            throw new Error('Failed to save bill');
+        }
+        
+        // Now send email
+        alert('Sending email... Please wait.');
+        
+        const emailResponse = await fetch(`${API_URL}/bills/${billId}/send-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (emailResponse.ok) {
+            const result = await emailResponse.json();
+            alert(`✅ ${result.message}`);
+            closeBillModal();
+            loadBills();
+        } else {
+            const error = await emailResponse.json();
+            throw new Error(error.error || 'Failed to send email');
+        }
+        
+    } catch (error) {
+        console.error('Error:', error);
+        alert(`Error: ${error.message}`);
+    }
+}
