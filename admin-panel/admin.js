@@ -2821,13 +2821,36 @@ async function emailBill(billId) {
     if (!confirmSend) return;
     
     try {
-        alert('Sending email... Please wait.');
-        
+        alert('Preparing PDF and sending email... Please wait.');
+
+        // Build invoice HTML (same as viewBill) inside a hidden container
+        const container = document.createElement('div');
+        container.style.position = 'fixed';
+        container.style.left = '-9999px';
+        container.style.top = '0';
+        container.style.width = '794px'; // approx A4 width at 96 DPI
+        container.innerHTML = getInvoiceHtml(bill);
+        document.body.appendChild(container);
+
+        // Generate PDF base64 using html2pdf
+        const opt = {
+            margin: 10,
+            filename: `Bill_${bill.billNo}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        const pdfBase64 = await html2pdf().set(opt).from(container).toPdf().get('pdf').then(pdf => pdf.output('datauristring')).then(uri => uri.split(',')[1]);
+
+        document.body.removeChild(container);
+
         const response = await fetch(`${API_URL}/bills/${billId}/send-email`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pdfBase64 })
         });
-        
+
         if (response.ok) {
             const result = await response.json();
             alert(`✅ ${result.message}`);
@@ -2961,12 +2984,27 @@ async function saveAndEmailBill() {
             throw new Error('Failed to save bill');
         }
         
-        // Now send email
-        alert('Sending email... Please wait.');
-        
+        // Now generate PDF client-side and send email
+        alert('Preparing PDF and sending email... Please wait.');
+
+        const container = document.createElement('div');
+        container.style.position = 'fixed';
+        container.style.left = '-9999px';
+        container.style.top = '0';
+        container.style.width = '794px';
+        // Use the freshly saved bill data for the PDF
+        const billForPdf = { ...billData, billNo: billData.billNo };
+        container.innerHTML = getInvoiceHtml({ ...billForPdf, _id: billId });
+        document.body.appendChild(container);
+
+        const opt = { margin: 10, filename: `Bill_${billData.billNo}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } };
+        const pdfBase64 = await html2pdf().set(opt).from(container).toPdf().get('pdf').then(pdf => pdf.output('datauristring')).then(uri => uri.split(',')[1]);
+        document.body.removeChild(container);
+
         const emailResponse = await fetch(`${API_URL}/bills/${billId}/send-email`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pdfBase64 })
         });
         
         if (emailResponse.ok) {
@@ -2983,4 +3021,35 @@ async function saveAndEmailBill() {
         console.error('Error:', error);
         alert(`Error: ${error.message}`);
     }
+}
+
+// Helper: build invoice HTML identical to viewBill but as inline HTML for html2pdf
+function getInvoiceHtml(bill) {
+        return `
+            <div style="font-family: Arial, sans-serif; padding: 20px 30px; font-size: 12px; line-height: 1.4;">
+                <style>
+                    .company-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:15px;padding-bottom:15px;border-bottom:3px double #333}.company-left{flex:1}.company-center{flex:2;text-align:center;padding:0 20px}.company-right{flex:1;text-align:right}.company-name{font-size:20px;font-weight:bold;color:#1e40af;margin-bottom:5px;letter-spacing:1px}.bus-icon{font-size:24px;color:#ea580c;margin-bottom:5px}.company-info{font-size:10px;color:#444;line-height:1.6}.contact-numbers{font-size:11px;font-weight:600;color:#333;line-height:1.8}.bill-header{text-align:center;margin:15px 0;padding:8px;background:linear-gradient(to right,#dbeafe,#fce7f3);border-radius:5px}.bill-header h2{font-size:16px;color:#1e40af;margin-bottom:5px}.bill-info{font-size:11px;color:#555}.section{margin:12px 0}.section-title{font-size:13px;font-weight:bold;color:#1e40af;border-bottom:2px solid #ddd;padding-bottom:4px;margin-bottom:8px}.row{display:flex;gap:15px;margin:6px 0}.col{flex:1}.field-label{font-weight:600;color:#555;font-size:11px}.field-value{color:#000;margin-top:2px;font-size:11px}.billing-summary{background:#f0f9ff;padding:12px;margin:12px 0;border:2px solid #1e40af;border-radius:5px}.summary-row{display:flex;justify-content:space-between;margin:5px 0;font-size:11px}.summary-label{font-weight:600;color:#555}.summary-value{font-weight:600;color:#000}.grand-total-row{margin-top:10px;padding-top:10px;border-top:2px solid #1e40af;font-size:14px}.grand-total-row .summary-label,.grand-total-row .summary-value{font-weight:bold;color:#1e40af}.amount-words{margin-top:8px;font-size:10px;font-style:italic;color:#666;text-align:center}.terms{background:#fffbeb;padding:10px;margin:12px 0;border-left:4px solid #f59e0b;font-size:10px}.terms strong{color:#b45309;display:block;margin-bottom:5px}.terms ul{margin-left:15px;line-height:1.6}.footer{text-align:center;margin-top:15px;padding-top:10px;border-top:2px solid #ddd;font-size:11px;color:#666}
+                </style>
+
+                <div class="company-header">
+                    <div class="company-left"><div class="company-info"><strong>Prop:</strong> P. Kiran Kumar</div></div>
+                    <div class="company-center"><div class="bus-icon">🚌</div><div class="company-name">PAVAN KRISHNA TRAVELS (GOUD)</div><div class="company-info">Shop No. 3-3-158/1, Enugulagadda, Chowrastha, HANAMKONDA</div></div>
+                    <div class="company-right"><div class="contact-numbers"><div>Cell: 98494 58582</div><div>98499 44429</div><div>98496 58850</div></div></div>
+                </div>
+
+                <div class="bill-header"><h2>TRAVEL BILL</h2><div class="bill-info">Bill No: <strong>${bill.billNo}</strong> | Date: <strong>${new Date(bill.date).toLocaleDateString('en-IN')}</strong></div></div>
+
+                <div class="section"><div class="section-title">Customer Details</div><div class="row"><div class="col"><div class="field-label">Name:</div><div class="field-value">${bill.customerName}</div></div><div class="col"><div class="field-label">Contact:</div><div class="field-value">${bill.contactNo}</div></div></div><div class="row"><div class="col"><div class="field-label">Address:</div><div class="field-value">${bill.address}</div></div></div></div>
+
+                <div class="section"><div class="section-title">Vehicle & Travel Details</div><div class="row"><div class="col"><div class="field-label">Vehicle No:</div><div class="field-value">${bill.vehicleNo}</div></div><div class="col"><div class="field-label">Seats:</div><div class="field-value">${bill.seats}</div></div><div class="col"><div class="field-label">Destination:</div><div class="field-value">${bill.destination}</div></div></div><div class="row"><div class="col"><div class="field-label">From:</div><div class="field-value">${new Date(bill.dateFrom).toLocaleDateString('en-IN')}</div></div><div class="col"><div class="field-label">To:</div><div class="field-value">${new Date(bill.dateTo).toLocaleDateString('en-IN')}</div></div></div></div>
+
+                <div class="billing-summary"><div class="section-title" style="border:none;margin-bottom:10px;">Billing Summary</div><div class="summary-row"><span class="summary-label">Rate per KM:</span><span class="summary-value">₹${bill.ratePerKm}</span></div><div class="summary-row"><span class="summary-label">Total Amount:</span><span class="summary-value">₹${parseFloat(bill.totalAmount).toLocaleString('en-IN')}</span></div><div class="summary-row"><span class="summary-label">Advance Paid:</span><span class="summary-value">₹${parseFloat(bill.advance).toLocaleString('en-IN')}</span></div><div class="summary-row"><span class="summary-label">Balance:</span><span class="summary-value">₹${(parseFloat(bill.totalAmount) - parseFloat(bill.advance)).toLocaleString('en-IN')}</span></div><div class="summary-row"><span class="summary-label">Driver Batta:</span><span class="summary-value">₹${parseFloat(bill.driverBatta).toLocaleString('en-IN')}</span></div><div class="summary-row"><span class="summary-label">Extra Charges:</span><span class="summary-value">₹${parseFloat(bill.extraCharges || 0).toLocaleString('en-IN')}</span></div><div class="summary-row grand-total-row"><span class="summary-label">Grand Total:</span><span class="summary-value">₹${parseFloat(bill.grandTotal).toLocaleString('en-IN')}</span></div><div class="amount-words">${bill.amountWords}</div></div>
+
+                <div class="terms"><strong>Important Terms:</strong><ul><li>Parking, Tollgates, Check Post, R.T.O, and State Taxes will be paid by the party</li><li>Hyderabad entrance tax paid by party only</li></ul></div>
+
+                ${bill.routeDetails ? `<div class="section"><div class="section-title">Route Details / Remarks</div><div class="field-value">${bill.routeDetails}</div></div>` : ''}
+
+                <div class="footer"><p><strong>Thank you for choosing PAVAN KRISHNA TRAVELS!</strong></p><p>For any queries, please contact us at the numbers mentioned above.</p></div>
+            </div>
+        `;
 }

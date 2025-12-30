@@ -934,42 +934,41 @@ app.post('/api/bills/:id/send-email', async (req, res) => {
     </html>
     `;
 
-    // Generate PDF using Puppeteer (serverless or local fallback)
-    let browser;
-    try {
-      if (isServerless) {
-        // Serverless (Vercel) uses puppeteer-core + @sparticuz/chromium
-        browser = await puppeteerCore.launch({
-          args: chromium.args,
-          defaultViewport: chromium.defaultViewport,
-          executablePath: await chromium.executablePath(),
-          headless: chromium.headless,
-        });
-      } else {
-        // Local dev: try system Chrome first, else fallback to full puppeteer
-        const localChrome = getLocalChromePath();
-        if (localChrome) {
+    // Prefer client-provided PDF to avoid serverless Chromium issues
+    let pdfBuffer;
+    const { pdfBase64 } = req.body || {};
+    if (pdfBase64) {
+      pdfBuffer = Buffer.from(pdfBase64, 'base64');
+    } else {
+      // Fallback: generate PDF using Puppeteer (serverless or local)
+      let browser;
+      try {
+        if (isServerless) {
           browser = await puppeteerCore.launch({
-            executablePath: localChrome,
-            headless: true,
+            args: chromium.args,
+            defaultViewport: chromium.defaultViewport,
+            executablePath: await chromium.executablePath(),
+            headless: chromium.headless,
           });
         } else {
-          // Lazy-require to avoid bundling in serverless
-          const puppeteer = require('puppeteer');
-          browser = await puppeteer.launch({ headless: true });
+          const localChrome = getLocalChromePath();
+          if (localChrome) {
+            browser = await puppeteerCore.launch({ executablePath: localChrome, headless: true });
+          } else {
+            const puppeteer = require('puppeteer');
+            browser = await puppeteer.launch({ headless: true });
+          }
         }
+
+        const page = await browser.newPage();
+        await page.setContent(invoiceHTML, { waitUntil: 'networkidle0' });
+        pdfBuffer = await page.pdf({ format: 'A4', printBackground: true, margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' } });
+        await browser.close();
+      } catch (pdfErr) {
+        if (browser) try { await browser.close(); } catch {}
+        throw pdfErr;
       }
-
-      const page = await browser.newPage();
-      await page.setContent(invoiceHTML, { waitUntil: 'networkidle0' });
-      
-      const pdfBuffer = await page.pdf({
-        format: 'A4',
-        printBackground: true,
-        margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' }
-      });
-
-      await browser.close();
+    }
 
       // Setup nodemailer transporter
       const transporter = nodemailer.createTransport({
@@ -1020,7 +1019,6 @@ app.post('/api/bills/:id/send-email', async (req, res) => {
       });
 
     } catch (pdfError) {
-      if (browser) await browser.close();
       throw pdfError;
     }
 
