@@ -3,8 +3,11 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 const nodemailer = require('nodemailer');
-const puppeteer = require('puppeteer-core');
-const chromium = require('chrome-aws-lambda');
+// Serverless-compatible core + chromium; fallback to local Puppeteer/Chrome on dev
+const puppeteerCore = require('puppeteer-core');
+const chromium = require('@sparticuz/chromium');
+const fs = require('fs');
+const os = require('os');
 require('dotenv').config();
 
 const Tour = require('./tourModel');
@@ -17,6 +20,39 @@ const Bill = require('./billModel');
 const { uploadImage, uploadMultipleImages } = require('./cloudinary');
 
 const app = express();
+
+// Detect serverless vs local environment
+const isServerless = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_VERSION;
+
+// Helper: find a local Chrome executable on Windows/macOS/Linux
+function getLocalChromePath() {
+  const platform = os.platform();
+  if (platform === 'win32') {
+    const candidates = [
+      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+      path.join(process.env.LOCALAPPDATA || '', 'Google\\Chrome\\Application\\chrome.exe'),
+      path.join(process.env.PROGRAMFILES || '', 'Google\\Chrome\\Application\\chrome.exe'),
+      path.join(process.env['PROGRAMFILES(X86)'] || '', 'Google\\Chrome\\Application\\chrome.exe'),
+    ];
+    for (const p of candidates) {
+      if (p && fs.existsSync(p)) return p;
+    }
+  } else if (platform === 'darwin') {
+    const macPath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+    if (fs.existsSync(macPath)) return macPath;
+  } else {
+    const linuxCandidates = [
+      '/usr/bin/google-chrome',
+      '/usr/bin/chromium',
+      '/usr/bin/chromium-browser',
+    ];
+    for (const p of linuxCandidates) {
+      if (fs.existsSync(p)) return p;
+    }
+  }
+  return null;
+}
 
 // Middleware
 const allowedOrigins = [
@@ -898,15 +934,31 @@ app.post('/api/bills/:id/send-email', async (req, res) => {
     </html>
     `;
 
-    // Generate PDF using puppeteer
+    // Generate PDF using Puppeteer (serverless or local fallback)
     let browser;
     try {
-      browser = await puppeteer.launch({
-        args: chromium.args,
-        defaultViewport: chromium.defaultViewport,
-        executablePath: await chromium.executablePath || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-        headless: chromium.headless || true,
-      });
+      if (isServerless) {
+        // Serverless (Vercel) uses puppeteer-core + @sparticuz/chromium
+        browser = await puppeteerCore.launch({
+          args: chromium.args,
+          defaultViewport: chromium.defaultViewport,
+          executablePath: await chromium.executablePath(),
+          headless: chromium.headless,
+        });
+      } else {
+        // Local dev: try system Chrome first, else fallback to full puppeteer
+        const localChrome = getLocalChromePath();
+        if (localChrome) {
+          browser = await puppeteerCore.launch({
+            executablePath: localChrome,
+            headless: true,
+          });
+        } else {
+          // Lazy-require to avoid bundling in serverless
+          const puppeteer = require('puppeteer');
+          browser = await puppeteer.launch({ headless: true });
+        }
+      }
 
       const page = await browser.newPage();
       await page.setContent(invoiceHTML, { waitUntil: 'networkidle0' });
