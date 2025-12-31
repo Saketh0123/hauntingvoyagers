@@ -3,56 +3,21 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 const nodemailer = require('nodemailer');
-// Serverless-compatible core + chromium; fallback to local Puppeteer/Chrome on dev
-const puppeteerCore = require('puppeteer-core');
+// Use puppeteer-core with @sparticuz/chromium on Vercel; local fallback to system Chrome
+const puppeteer = require('puppeteer-core');
 const chromium = require('@sparticuz/chromium');
-const fs = require('fs');
-const os = require('os');
 require('dotenv').config();
 
-const Tour = require('../backend/tourModel');
-const Settings = require('../backend/settingsModel');
-const Travell = require('../backend/travellModel');
-const HeroImage = require('../backend/heroImageModel');
-const Booking = require('../backend/bookingModel');
-const PricingCard = require('../backend/pricingModel');
-const Bill = require('../backend/billModel');
-const { uploadImage, uploadMultipleImages } = require('../backend/cloudinary');
+const Tour = require('./tourModel');
+const Settings = require('./settingsModel');
+const Travell = require('./travellModel');
+const HeroImage = require('./heroImageModel');
+const Booking = require('./bookingModel');
+const PricingCard = require('./pricingModel');
+const Bill = require('./billModel');
+const { uploadImage, uploadMultipleImages } = require('./cloudinary');
 
 const app = express();
-
-// Detect serverless vs local environment
-const isServerless = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_VERSION;
-
-// Helper: find a local Chrome executable on Windows/macOS/Linux
-function getLocalChromePath() {
-  const platform = os.platform();
-  if (platform === 'win32') {
-    const candidates = [
-      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-      'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-      path.join(process.env.LOCALAPPDATA || '', 'Google\\Chrome\\Application\\chrome.exe'),
-      path.join(process.env.PROGRAMFILES || '', 'Google\\Chrome\\Application\\chrome.exe'),
-      path.join(process.env['PROGRAMFILES(X86)'] || '', 'Google\\Chrome\\Application\\chrome.exe'),
-    ];
-    for (const p of candidates) {
-      if (p && fs.existsSync(p)) return p;
-    }
-  } else if (platform === 'darwin') {
-    const macPath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-    if (fs.existsSync(macPath)) return macPath;
-  } else {
-    const linuxCandidates = [
-      '/usr/bin/google-chrome',
-      '/usr/bin/chromium',
-      '/usr/bin/chromium-browser',
-    ];
-    for (const p of linuxCandidates) {
-      if (fs.existsSync(p)) return p;
-    }
-  }
-  return null;
-}
 
 // Middleware
 const allowedOrigins = [
@@ -934,41 +899,28 @@ app.post('/api/bills/:id/send-email', async (req, res) => {
     </html>
     `;
 
-    // Prefer client-provided PDF to avoid serverless Chromium issues
-    let pdfBuffer;
-    const { pdfBase64 } = req.body || {};
-    if (pdfBase64) {
-      pdfBuffer = Buffer.from(pdfBase64, 'base64');
-    } else {
-      // Fallback: generate PDF using Puppeteer (serverless or local)
-      let browser;
-      try {
-        if (isServerless) {
-          browser = await puppeteerCore.launch({
-            args: chromium.args,
-            defaultViewport: chromium.defaultViewport,
-            executablePath: await chromium.executablePath(),
-            headless: chromium.headless,
-          });
-        } else {
-          const localChrome = getLocalChromePath();
-          if (localChrome) {
-            browser = await puppeteerCore.launch({ executablePath: localChrome, headless: true });
-          } else {
-            const puppeteer = require('puppeteer');
-            browser = await puppeteer.launch({ headless: true });
-          }
-        }
+    // Generate PDF using puppeteer (serverless or local fallback)
+    let browser;
+    try {
+      const isVercel = !!process.env.VERCEL;
+      const execPath = isVercel ? await chromium.executablePath() : 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+      browser = await puppeteer.launch({
+        args: chromium.args,
+        defaultViewport: chromium.defaultViewport,
+        executablePath: execPath,
+        headless: isVercel ? chromium.headless : true,
+      });
 
-        const page = await browser.newPage();
-        await page.setContent(invoiceHTML, { waitUntil: 'networkidle0' });
-        pdfBuffer = await page.pdf({ format: 'A4', printBackground: true, margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' } });
-        await browser.close();
-      } catch (pdfErr) {
-        if (browser) try { await browser.close(); } catch {}
-        throw pdfErr;
-      }
-    }
+      const page = await browser.newPage();
+      await page.setContent(invoiceHTML, { waitUntil: 'networkidle0' });
+      
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' }
+      });
+
+      await browser.close();
 
       // Setup nodemailer transporter
       const transporter = nodemailer.createTransport({
@@ -1019,6 +971,7 @@ app.post('/api/bills/:id/send-email', async (req, res) => {
       });
 
     } catch (pdfError) {
+      if (browser) await browser.close();
       throw pdfError;
     }
 
