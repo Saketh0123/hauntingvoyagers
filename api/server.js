@@ -3,12 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 const nodemailer = require('nodemailer');
-// Use puppeteer-core with @sparticuz/chromium on Vercel; local fallback to system Chrome
-const puppeteer = require('puppeteer-core');
-const chromium = require('@sparticuz/chromium');
-// Ensure headless + no GPU in serverless environments
-chromium.setHeadlessMode = true;
-chromium.setGraphicsMode = false;
+const PDFDocument = require('pdfkit');
 require('dotenv').config();
 
 const Tour = require('./tourModel');
@@ -540,7 +535,18 @@ app.post('/api/bills', async (req, res) => {
     await bill.save();
     res.status(201).json(bill);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    if (error && error.code === 11000) {
+      const key = Object.keys(error.keyPattern || error.keyValue || {})[0] || 'field';
+      if (key === 'billNo') {
+        return res.status(409).json({ error: 'Bill No already exists. Please use a different Bill No.' });
+      }
+      return res.status(409).json({ error: `${key} already exists. Please use a different value.` });
+    }
+    if (error && error.name === 'ValidationError') {
+      const firstError = Object.values(error.errors || {})[0];
+      return res.status(400).json({ error: firstError?.message || error.message });
+    }
+    res.status(400).json({ error: error?.message || 'Failed to save bill' });
   }
 });
 
@@ -551,7 +557,18 @@ app.put('/api/bills/:id', async (req, res) => {
     if (!bill) return res.status(404).json({ error: 'Bill not found' });
     res.json(bill);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    if (error && error.code === 11000) {
+      const key = Object.keys(error.keyPattern || error.keyValue || {})[0] || 'field';
+      if (key === 'billNo') {
+        return res.status(409).json({ error: 'Bill No already exists. Please use a different Bill No.' });
+      }
+      return res.status(409).json({ error: `${key} already exists. Please use a different value.` });
+    }
+    if (error && error.name === 'ValidationError') {
+      const firstError = Object.values(error.errors || {})[0];
+      return res.status(400).json({ error: firstError?.message || error.message });
+    }
+    res.status(400).json({ error: error?.message || 'Failed to update bill' });
   }
 });
 
@@ -566,417 +583,473 @@ app.delete('/api/bills/:id', async (req, res) => {
   }
 });
 
+function formatDateIN(dateValue) {
+  if (!dateValue) return '';
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+}
+
+function formatINR(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '0';
+  return number.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+}
+
+function buildBillPdfBuffer(bill) {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({ size: 'A4', margin: 36 });
+      const chunks = [];
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      const pageWidth = doc.page.width;
+      const margin = doc.page.margins.left;
+      const contentWidth = pageWidth - doc.page.margins.left - doc.page.margins.right;
+
+      const colors = {
+        blue: '#1e40af',
+        orange: '#ea580c',
+        lightBlue: '#f0f9ff',
+        grayText: '#555555',
+        lightGrayLine: '#dddddd',
+        amberBg: '#fffbeb',
+        amber: '#f59e0b',
+        amberText: '#b45309'
+      };
+
+      const labelFontSize = 9;
+      const valueFontSize = 10;
+
+      const drawSectionTitle = (title) => {
+        doc
+          .font('Helvetica-Bold')
+          .fontSize(11)
+          .fillColor(colors.blue)
+          .text(title, margin, doc.y);
+
+        const y = doc.y + 3;
+        doc
+          .moveTo(margin, y)
+          .lineTo(margin + contentWidth, y)
+          .lineWidth(2)
+          .strokeColor(colors.lightGrayLine)
+          .stroke();
+        doc.moveDown(0.8);
+      };
+
+      const drawField = ({ x, y, label, value, width }) => {
+        doc
+          .font('Helvetica-Bold')
+          .fontSize(labelFontSize)
+          .fillColor(colors.grayText)
+          .text(label, x, y, { width });
+
+        doc
+          .font('Helvetica')
+          .fontSize(valueFontSize)
+          .fillColor('#000000')
+          .text(value || '', x, y + 12, { width });
+      };
+
+      // Company header
+      const headerTop = doc.y;
+      const leftW = contentWidth * 0.25;
+      const centerW = contentWidth * 0.5;
+      const rightW = contentWidth * 0.25;
+
+      const propText = 'Prop: P. Kiran Kumar';
+      const companyTitleLine1 = 'PAVAN KRISHNA TRAVELS';
+      const companyTitleLine2 = '(GOUD)';
+      const companyAddress = 'Shop No. 3-3-158/1, Enugulagadda,\nChowrastha, HANAMKONDA';
+
+      // Left
+      doc
+        .font('Helvetica')
+        .fontSize(9)
+        .fillColor('#444444')
+        .text(propText, margin, headerTop, { width: leftW });
+
+      const leftBottom = headerTop + doc.heightOfString(propText, { width: leftW }) + 2;
+
+      // Center
+      const centerX = margin + leftW;
+
+      // Bus icon (vector) to match the HTML header feel
+      const busW = 26;
+      const busH = 12;
+      const busX = centerX + (centerW - busW) / 2;
+      const busY = headerTop + 2;
+      doc
+        .roundedRect(busX, busY, busW, busH, 2)
+        .fillColor(colors.orange)
+        .fill();
+      doc
+        .rect(busX + 4, busY + 3, 5, 4)
+        .fillColor('#ffffff')
+        .fill();
+      doc
+        .rect(busX + 10, busY + 3, 5, 4)
+        .fillColor('#ffffff')
+        .fill();
+      doc
+        .rect(busX + 16, busY + 3, 5, 4)
+        .fillColor('#ffffff')
+        .fill();
+      doc
+        .circle(busX + 7, busY + busH + 2, 2)
+        .fillColor('#333333')
+        .fill();
+      doc
+        .circle(busX + busW - 7, busY + busH + 2, 2)
+        .fillColor('#333333')
+        .fill();
+
+      // Auto-fit title to avoid wrapping/overlap
+      let titleFontSize = 16;
+      doc.font('Helvetica-Bold');
+      while (titleFontSize > 11 && doc.widthOfString(companyTitleLine1, { size: titleFontSize }) > centerW) {
+        titleFontSize -= 1;
+      }
+
+      const titleY = busY + busH + 6;
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(titleFontSize)
+        .fillColor(colors.blue)
+        .text(companyTitleLine1, centerX, titleY, {
+          width: centerW,
+          align: 'center'
+        });
+
+      const titleLine1Height = doc.heightOfString(companyTitleLine1, { width: centerW, align: 'center' });
+      const titleLine2Y = titleY + titleLine1Height + 1;
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(Math.max(12, titleFontSize - 1))
+        .fillColor(colors.blue)
+        .text(companyTitleLine2, centerX, titleLine2Y, {
+          width: centerW,
+          align: 'center'
+        });
+
+      const titleLine2Height = doc.heightOfString(companyTitleLine2, { width: centerW, align: 'center' });
+      const addressY = titleLine2Y + titleLine2Height + 3;
+
+      doc
+        .font('Helvetica')
+        .fontSize(9)
+        .fillColor('#444444')
+        .text(companyAddress, centerX, addressY, {
+          width: centerW,
+          align: 'center'
+        });
+
+      const addressHeight = doc.heightOfString(companyAddress, { width: centerW, align: 'center' });
+      const centerBottom = addressY + addressHeight + 2;
+
+      // Right
+      const rightX = margin + leftW + centerW;
+      const rightLines = ['Cell: 98494 58582', '98499 44429', '98496 58850'];
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(9)
+        .fillColor('#333333')
+        .text(rightLines[0], rightX, headerTop, { width: rightW, align: 'right' })
+        .text(rightLines[1], rightX, headerTop + 12, { width: rightW, align: 'right' })
+        .text(rightLines[2], rightX, headerTop + 24, { width: rightW, align: 'right' });
+
+      const rightBottom = headerTop + 24 + doc.heightOfString(rightLines[2], { width: rightW, align: 'right' }) + 2;
+
+      // Double border line
+      const headerBottom = Math.max(leftBottom, centerBottom, rightBottom) + 10;
+      doc
+        .moveTo(margin, headerBottom)
+        .lineTo(margin + contentWidth, headerBottom)
+        .lineWidth(1)
+        .strokeColor('#333333')
+        .stroke();
+      doc
+        .moveTo(margin, headerBottom + 3)
+        .lineTo(margin + contentWidth, headerBottom + 3)
+        .lineWidth(1)
+        .strokeColor('#333333')
+        .stroke();
+      doc.y = headerBottom + 10;
+
+      // Bill header (filled band)
+      const bandY = doc.y;
+      doc
+        .rect(margin, bandY, contentWidth, 44)
+        .fillColor('#dbeafe')
+        .fill();
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(14)
+        .fillColor(colors.blue)
+        .text('TRAVEL BILL', margin, bandY + 8, { width: contentWidth, align: 'center' });
+      doc
+        .font('Helvetica')
+        .fontSize(9)
+        .fillColor(colors.grayText)
+        .text(
+          `Bill No: ${bill.billNo || ''} | Date: ${formatDateIN(bill.date)}`,
+          margin,
+          bandY + 26,
+          { width: contentWidth, align: 'center' }
+        );
+      doc.y = bandY + 54;
+
+      // Customer Details
+      drawSectionTitle('Customer Details');
+      const rowY1 = doc.y;
+      drawField({ x: margin, y: rowY1, width: contentWidth / 2 - 8, label: 'Name:', value: bill.customerName });
+      drawField({
+        x: margin + contentWidth / 2 + 8,
+        y: rowY1,
+        width: contentWidth / 2 - 8,
+        label: 'Contact:',
+        value: bill.contactNo
+      });
+      doc.y = rowY1 + 34;
+      const rowY2 = doc.y;
+      drawField({ x: margin, y: rowY2, width: contentWidth, label: 'Address:', value: bill.address });
+      doc.y = rowY2 + 40;
+
+      // Vehicle & Travel Details
+      drawSectionTitle('Vehicle & Travel Details');
+      const rowY3 = doc.y;
+      const third = contentWidth / 3;
+      drawField({ x: margin, y: rowY3, width: third - 10, label: 'Vehicle No:', value: bill.vehicleNo });
+      drawField({ x: margin + third, y: rowY3, width: third - 10, label: 'Seats:', value: String(bill.seats ?? '') });
+      drawField({
+        x: margin + third * 2,
+        y: rowY3,
+        width: third,
+        label: 'Destination:',
+        value: bill.destination
+      });
+      doc.y = rowY3 + 34;
+      const rowY4 = doc.y;
+      drawField({
+        x: margin,
+        y: rowY4,
+        width: contentWidth / 2 - 8,
+        label: 'From:',
+        value: formatDateIN(bill.dateFrom)
+      });
+      drawField({
+        x: margin + contentWidth / 2 + 8,
+        y: rowY4,
+        width: contentWidth / 2 - 8,
+        label: 'To:',
+        value: formatDateIN(bill.dateTo)
+      });
+      doc.y = rowY4 + 42;
+
+      // Billing Summary box
+      const summaryTop = doc.y;
+      const summaryHeight = 155;
+      doc
+        .rect(margin, summaryTop, contentWidth, summaryHeight)
+        .fillColor(colors.lightBlue)
+        .fill();
+      doc
+        .rect(margin, summaryTop, contentWidth, summaryHeight)
+        .lineWidth(2)
+        .strokeColor(colors.blue)
+        .stroke();
+
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(11)
+        .fillColor(colors.blue)
+        .text('Billing Summary', margin + 10, summaryTop + 10);
+
+      const summaryLabelX = margin + 10;
+      const summaryValueX = margin + contentWidth - 10;
+      let sy = summaryTop + 32;
+
+      const summaryRow = (label, value, { bold = false, blue = false } = {}) => {
+        doc
+          .font(bold ? 'Helvetica-Bold' : 'Helvetica')
+          .fontSize(9)
+          .fillColor(blue ? colors.blue : colors.grayText)
+          .text(label, summaryLabelX, sy, { width: contentWidth - 20 });
+
+        doc
+          .font(bold ? 'Helvetica-Bold' : 'Helvetica-Bold')
+          .fontSize(9)
+          .fillColor('#000000')
+          .text(value, summaryLabelX, sy, {
+            width: contentWidth - 20,
+            align: 'right'
+          });
+        sy += 16;
+      };
+
+      const totalAmount = Number(bill.totalAmount) || 0;
+      const advance = Number(bill.advance) || 0;
+      const computedBalance = totalAmount - advance;
+
+      summaryRow('Rate per KM:', `Rs. ${formatINR(bill.ratePerKm)}`);
+      summaryRow('Total Amount:', `Rs. ${formatINR(totalAmount)}`);
+      summaryRow('Advance Paid:', `Rs. ${formatINR(advance)}`);
+      summaryRow('Balance:', `Rs. ${formatINR(computedBalance)}`);
+      summaryRow('Driver Batta:', `Rs. ${formatINR(bill.driverBatta)}`);
+      summaryRow('Extra Charges:', `Rs. ${formatINR(bill.extraCharges || 0)}`);
+
+      // Grand total divider
+      doc
+        .moveTo(margin + 10, sy + 2)
+        .lineTo(margin + contentWidth - 10, sy + 2)
+        .lineWidth(2)
+        .strokeColor(colors.blue)
+        .stroke();
+      sy += 10;
+      summaryRow('Grand Total:', `Rs. ${formatINR(bill.grandTotal)}`, { bold: true, blue: true });
+
+      doc
+        .font('Helvetica-Oblique')
+        .fontSize(8)
+        .fillColor('#666666')
+        .text(bill.amountWords || '', margin + 10, summaryTop + summaryHeight - 22, {
+          width: contentWidth - 20,
+          align: 'center'
+        });
+
+      doc.y = summaryTop + summaryHeight + 12;
+
+      // Terms box
+      const termsTop = doc.y;
+      const termsHeight = 60;
+      doc
+        .rect(margin, termsTop, contentWidth, termsHeight)
+        .fillColor(colors.amberBg)
+        .fill();
+      doc
+        .rect(margin, termsTop, 4, termsHeight)
+        .fillColor(colors.amber)
+        .fill();
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(9)
+        .fillColor(colors.amberText)
+        .text('Important Terms:', margin + 10, termsTop + 10);
+      doc
+        .font('Helvetica')
+        .fontSize(8)
+        .fillColor('#000000')
+        .text('• Parking, Tollgates, Check Post, R.T.O, and State Taxes will be paid by the party', margin + 16, termsTop + 26, {
+          width: contentWidth - 26
+        })
+        .text('• Hyderabad entrance tax paid by party only', margin + 16, termsTop + 40, {
+          width: contentWidth - 26
+        });
+      doc.y = termsTop + termsHeight + 12;
+
+      // Route details / remarks
+      if (bill.routeDetails) {
+        drawSectionTitle('Route Details / Remarks');
+        doc
+          .font('Helvetica')
+          .fontSize(10)
+          .fillColor('#000000')
+          .text(String(bill.routeDetails), margin, doc.y, { width: contentWidth });
+        doc.moveDown(0.8);
+      }
+
+      // Footer
+      const footerLineY = doc.y + 6;
+      doc
+        .moveTo(margin, footerLineY)
+        .lineTo(margin + contentWidth, footerLineY)
+        .lineWidth(2)
+        .strokeColor(colors.lightGrayLine)
+        .stroke();
+      doc.y = footerLineY + 10;
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(10)
+        .fillColor('#666666')
+        .text('Thank you for choosing PAVAN KRISHNA TRAVELS!', margin, doc.y, { width: contentWidth, align: 'center' });
+      doc
+        .font('Helvetica')
+        .fontSize(9)
+        .fillColor('#666666')
+        .text('For any queries, please contact us at the numbers mentioned above.', margin, doc.y + 14, {
+          width: contentWidth,
+          align: 'center'
+        });
+
+      doc.end();
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
 // Generate PDF and send email for bill
 app.post('/api/bills/:id/send-email', async (req, res) => {
   try {
     const bill = await Bill.findById(req.params.id);
     if (!bill) return res.status(404).json({ error: 'Bill not found' });
 
-    // Generate HTML for invoice (matching exact viewBill styling)
-    const invoiceHTML = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <title>Bill - ${bill.billNo}</title>
-      <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-          font-family: Arial, sans-serif; 
-          padding: 20px 30px; 
-          max-width: 210mm;
-          margin: 0 auto;
-          font-size: 12px;
-          line-height: 1.4;
-        }
-        
-        /* Header Section */
-        .company-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          margin-bottom: 15px;
-          padding-bottom: 15px;
-          border-bottom: 3px double #333;
-        }
-        .company-left { flex: 1; }
-        .company-center { flex: 2; text-align: center; padding: 0 20px; }
-        .company-right { flex: 1; text-align: right; }
-        .company-name {
-          font-size: 20px;
-          font-weight: bold;
-          color: #1e40af;
-          margin-bottom: 5px;
-          letter-spacing: 1px;
-        }
-        .bus-icon {
-          font-size: 24px;
-          color: #ea580c;
-          margin-bottom: 5px;
-        }
-        .company-info {
-          font-size: 10px;
-          color: #444;
-          line-height: 1.6;
-        }
-        .contact-numbers {
-          font-size: 11px;
-          font-weight: 600;
-          color: #333;
-          line-height: 1.8;
-        }
-        
-        /* Bill Header */
-        .bill-header {
-          text-align: center;
-          margin: 15px 0;
-          padding: 8px;
-          background: linear-gradient(to right, #dbeafe, #fce7f3);
-          border-radius: 5px;
-        }
-        .bill-header h2 {
-          font-size: 16px;
-          color: #1e40af;
-          margin-bottom: 5px;
-        }
-        .bill-info {
-          font-size: 11px;
-          color: #555;
-        }
-        
-        /* Content Sections */
-        .section {
-          margin: 12px 0;
-        }
-        .section-title {
-          font-size: 13px;
-          font-weight: bold;
-          color: #1e40af;
-          border-bottom: 2px solid #ddd;
-          padding-bottom: 4px;
-          margin-bottom: 8px;
-        }
-        .row {
-          display: flex;
-          gap: 15px;
-          margin: 6px 0;
-        }
-        .col {
-          flex: 1;
-        }
-        .field-label {
-          font-weight: 600;
-          color: #555;
-          font-size: 11px;
-        }
-        .field-value {
-          color: #000;
-          margin-top: 2px;
-          font-size: 11px;
-        }
-        
-        /* Billing Summary */
-        .billing-summary {
-          background: #f0f9ff;
-          padding: 12px;
-          margin: 12px 0;
-          border: 2px solid #1e40af;
-          border-radius: 5px;
-        }
-        .summary-row {
-          display: flex;
-          justify-content: space-between;
-          margin: 5px 0;
-          font-size: 11px;
-        }
-        .summary-label {
-          font-weight: 600;
-          color: #555;
-        }
-        .summary-value {
-          font-weight: 600;
-          color: #000;
-        }
-        .grand-total-row {
-          margin-top: 10px;
-          padding-top: 10px;
-          border-top: 2px solid #1e40af;
-          font-size: 14px;
-        }
-        .grand-total-row .summary-label,
-        .grand-total-row .summary-value {
-          font-weight: bold;
-          color: #1e40af;
-        }
-        .amount-words {
-          margin-top: 8px;
-          font-size: 10px;
-          font-style: italic;
-          color: #666;
-          text-align: center;
-        }
-        
-        /* Terms */
-        .terms {
-          background: #fffbeb;
-          padding: 10px;
-          margin: 12px 0;
-          border-left: 4px solid #f59e0b;
-          font-size: 10px;
-        }
-        .terms strong {
-          color: #b45309;
-          display: block;
-          margin-bottom: 5px;
-        }
-        .terms ul {
-          margin-left: 15px;
-          line-height: 1.6;
-        }
-        
-        /* Footer */
-        .footer {
-          text-align: center;
-          margin-top: 15px;
-          padding-top: 10px;
-          border-top: 2px solid #ddd;
-          font-size: 11px;
-          color: #666;
-        }
-        
-        /* Print Styles */
-        @media print {
-          body { 
-            padding: 15px 20px;
-            font-size: 11px;
-          }
-          .company-name { font-size: 18px; }
-          .bill-header h2 { font-size: 15px; }
-          @page {
-            size: A4;
-            margin: 10mm;
-          }
-        }
-      </style>
-    </head>
-    <body>
-      <!-- Company Header -->
-      <div class="company-header">
-        <div class="company-left">
-          <div class="company-info">
-            <strong>Prop:</strong> P. Kiran Kumar
-          </div>
-        </div>
-        
-        <div class="company-center">
-          <div class="bus-icon">🚌</div>
-          <div class="company-name">PAVAN KRISHNA TRAVELS (GOUD)</div>
-          <div class="company-info">
-            Shop No. 3-3-158/1, Enugulagadda, Chowrastha, HANAMKONDA
-          </div>
-        </div>
-        
-        <div class="company-right">
-          <div class="contact-numbers">
-            <div>Cell: 98494 58582</div>
-            <div>98499 44429</div>
-            <div>98496 58850</div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Bill Header -->
-      <div class="bill-header">
-        <h2>TRAVEL BILL</h2>
-        <div class="bill-info">
-          Bill No: <strong>${bill.billNo}</strong> | Date: <strong>${new Date(bill.date).toLocaleDateString('en-IN')}</strong>
-        </div>
-      </div>
-      
-      <!-- Customer Details -->
-      <div class="section">
-        <div class="section-title">Customer Details</div>
-        <div class="row">
-          <div class="col">
-            <div class="field-label">Name:</div>
-            <div class="field-value">${bill.customerName}</div>
-          </div>
-          <div class="col">
-            <div class="field-label">Contact:</div>
-            <div class="field-value">${bill.contactNo}</div>
-          </div>
-        </div>
-        <div class="row">
-          <div class="col">
-            <div class="field-label">Address:</div>
-            <div class="field-value">${bill.address}</div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Vehicle & Travel Details -->
-      <div class="section">
-        <div class="section-title">Vehicle & Travel Details</div>
-        <div class="row">
-          <div class="col">
-            <div class="field-label">Vehicle No:</div>
-            <div class="field-value">${bill.vehicleNo}</div>
-          </div>
-          <div class="col">
-            <div class="field-label">Seats:</div>
-            <div class="field-value">${bill.seats}</div>
-          </div>
-          <div class="col">
-            <div class="field-label">Destination:</div>
-            <div class="field-value">${bill.destination}</div>
-          </div>
-        </div>
-        <div class="row">
-          <div class="col">
-            <div class="field-label">From:</div>
-            <div class="field-value">${new Date(bill.dateFrom).toLocaleDateString('en-IN')}</div>
-          </div>
-          <div class="col">
-            <div class="field-label">To:</div>
-            <div class="field-value">${new Date(bill.dateTo).toLocaleDateString('en-IN')}</div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Billing Summary -->
-      <div class="billing-summary">
-        <div class="section-title" style="border: none; margin-bottom: 10px;">Billing Summary</div>
-        <div class="summary-row">
-          <span class="summary-label">Rate per KM:</span>
-          <span class="summary-value">₹${bill.ratePerKm}</span>
-        </div>
-        <div class="summary-row">
-          <span class="summary-label">Total Amount:</span>
-          <span class="summary-value">₹${parseFloat(bill.totalAmount).toLocaleString('en-IN')}</span>
-        </div>
-        <div class="summary-row">
-          <span class="summary-label">Advance Paid:</span>
-          <span class="summary-value">₹${parseFloat(bill.advance).toLocaleString('en-IN')}</span>
-        </div>
-        <div class="summary-row">
-          <span class="summary-label">Balance:</span>
-          <span class="summary-value">₹${(parseFloat(bill.totalAmount) - parseFloat(bill.advance)).toLocaleString('en-IN')}</span>
-        </div>
-        <div class="summary-row">
-          <span class="summary-label">Driver Batta:</span>
-          <span class="summary-value">₹${parseFloat(bill.driverBatta).toLocaleString('en-IN')}</span>
-        </div>
-        <div class="summary-row">
-          <span class="summary-label">Extra Charges:</span>
-          <span class="summary-value">₹${parseFloat(bill.extraCharges || 0).toLocaleString('en-IN')}</span>
-        </div>
-        <div class="summary-row grand-total-row">
-          <span class="summary-label">Grand Total:</span>
-          <span class="summary-value">₹${parseFloat(bill.grandTotal).toLocaleString('en-IN')}</span>
-        </div>
-        <div class="amount-words">${bill.amountWords}</div>
-      </div>
-      
-      <!-- Terms -->
-      <div class="terms">
-        <strong>Important Terms:</strong>
-        <ul>
-          <li>Parking, Tollgates, Check Post, R.T.O, and State Taxes will be paid by the party</li>
-          <li>Hyderabad entrance tax paid by party only</li>
-        </ul>
-      </div>
-      
-      ${bill.routeDetails ? `
-      <div class="section">
-        <div class="section-title">Route Details / Remarks</div>
-        <div class="field-value">${bill.routeDetails}</div>
-      </div>
-      ` : ''}
-      
-      <!-- Footer -->
-      <div class="footer">
-        <p><strong>Thank you for choosing PAVAN KRISHNA TRAVELS!</strong></p>
-        <p>For any queries, please contact us at the numbers mentioned above.</p>
-      </div>
-    </body>
-    </html>
-    `;
-
-    // Generate PDF using puppeteer (serverless or local fallback)
-    let browser;
-    try {
-      const isVercel = !!process.env.VERCEL;
-      const execPath = isVercel ? await chromium.executablePath() : 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-      browser = await puppeteer.launch({
-        args: chromium.args,
-        defaultViewport: chromium.defaultViewport,
-        executablePath: execPath,
-        headless: isVercel ? chromium.headless : true,
-      });
-
-      const page = await browser.newPage();
-      await page.setContent(invoiceHTML, { waitUntil: 'networkidle0' });
-      
-      const pdfBuffer = await page.pdf({
-        format: 'A4',
-        printBackground: true,
-        margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' }
-      });
-
-      await browser.close();
-
-      // Setup nodemailer transporter
-      const transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 587,
-        secure: false,
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS
-        }
-      });
-
-      // Send email with PDF attachment
-      const mailOptions = {
-        from: `"PAVAN KRISHNA TRAVELS" <${process.env.EMAIL_USER}>`,
-        to: bill.customerEmail,
-        subject: `Bill ${bill.billNo} - PAVAN KRISHNA TRAVELS`,
-        text: `Dear ${bill.customerName},\n\nThank you for choosing PAVAN KRISHNA TRAVELS.\n\nPlease find attached your bill for the journey to ${bill.destination}.\n\nBill Number: ${bill.billNo}\nGrand Total: ₹${bill.grandTotal}\n\nFor any queries, please contact us at:\n98494 58582 | 98499 44429 | 98496 58850\n\nBest Regards,\nPAVAN KRISHNA TRAVELS`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #1e40af;">🚌 PAVAN KRISHNA TRAVELS</h2>
-            <p>Dear <strong>${bill.customerName}</strong>,</p>
-            <p>Thank you for choosing PAVAN KRISHNA TRAVELS.</p>
-            <p>Please find attached your bill for the journey to <strong>${bill.destination}</strong>.</p>
-            <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
-              <p style="margin: 5px 0;"><strong>Bill Number:</strong> ${bill.billNo}</p>
-              <p style="margin: 5px 0;"><strong>Grand Total:</strong> ₹${bill.grandTotal}</p>
-            </div>
-            <p>For any queries, please contact us at:</p>
-            <p><strong>98494 58582 | 98499 44429 | 98496 58850</strong></p>
-            <p style="margin-top: 30px;">Best Regards,<br><strong>PAVAN KRISHNA TRAVELS</strong></p>
-          </div>
-        `,
-        attachments: [
-          {
-            filename: `Bill_${bill.billNo}.pdf`,
-            content: pdfBuffer,
-            contentType: 'application/pdf'
-          }
-        ]
-      };
-
-      await transporter.sendMail(mailOptions);
-
-      res.json({ 
-        success: true, 
-        message: `Bill sent successfully to ${bill.customerEmail}` 
-      });
-
-    } catch (pdfError) {
-      if (browser) await browser.close();
-      throw pdfError;
+    if (!bill.customerEmail) {
+      return res.status(400).json({ error: 'Customer email is missing' });
     }
+
+    const pdfBuffer = await buildBillPdfBuffer(bill);
+
+    // Setup nodemailer transporter
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
+    });
+
+    // Send email with PDF attachment
+    const mailOptions = {
+      from: `"PAVAN KRISHNA TRAVELS" <${process.env.EMAIL_USER}>`,
+      to: bill.customerEmail,
+      subject: `Bill ${bill.billNo} - PAVAN KRISHNA TRAVELS`,
+      text: `Dear ${bill.customerName},\n\nThank you for choosing PAVAN KRISHNA TRAVELS.\n\nPlease find attached your bill for the journey to ${bill.destination}.\n\nBill Number: ${bill.billNo}\nGrand Total: Rs. ${formatINR(bill.grandTotal)}\n\nFor any queries, please contact us at:\n98494 58582 | 98499 44429 | 98496 58850\n\nBest Regards,\nPAVAN KRISHNA TRAVELS`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #1e40af;">PAVAN KRISHNA TRAVELS</h2>
+          <p>Dear <strong>${bill.customerName}</strong>,</p>
+          <p>Thank you for choosing PAVAN KRISHNA TRAVELS.</p>
+          <p>Please find attached your bill for the journey to <strong>${bill.destination}</strong>.</p>
+          <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>Bill Number:</strong> ${bill.billNo}</p>
+            <p style="margin: 5px 0;"><strong>Grand Total:</strong> Rs. ${formatINR(bill.grandTotal)}</p>
+          </div>
+          <p>For any queries, please contact us at:</p>
+          <p><strong>98494 58582 | 98499 44429 | 98496 58850</strong></p>
+          <p style="margin-top: 30px;">Best Regards,<br><strong>PAVAN KRISHNA TRAVELS</strong></p>
+        </div>
+      `,
+      attachments: [
+        {
+          filename: `Bill_${bill.billNo}.pdf`,
+          content: pdfBuffer,
+          contentType: 'application/pdf'
+        }
+      ]
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.json({
+      success: true,
+      message: `Bill sent successfully to ${bill.customerEmail}`
+    });
 
   } catch (error) {
     console.error('Email sending error:', error);

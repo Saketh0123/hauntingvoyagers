@@ -2218,12 +2218,47 @@ async function saveHeroContent() {
 let allBills = [];
 let editingBillId = null;
 
+function getBillNoNumber(billNo) {
+    const number = Number(String(billNo ?? '').trim());
+    return Number.isFinite(number) ? number : NaN;
+}
+
+function sortBillsInPlace() {
+    allBills = allBills
+        .map((bill, originalIndex) => ({ bill, originalIndex }))
+        .sort((a, b) => {
+            const an = getBillNoNumber(a.bill.billNo);
+            const bn = getBillNoNumber(b.bill.billNo);
+            const aIsNum = Number.isFinite(an);
+            const bIsNum = Number.isFinite(bn);
+
+            if (aIsNum && bIsNum && an !== bn) return an - bn;
+            if (aIsNum && !bIsNum) return -1;
+            if (!aIsNum && bIsNum) return 1;
+
+            const ad = new Date(a.bill.date).getTime();
+            const bd = new Date(b.bill.date).getTime();
+            if (Number.isFinite(ad) && Number.isFinite(bd) && ad !== bd) return ad - bd;
+            return a.originalIndex - b.originalIndex;
+        })
+        .map(x => x.bill);
+}
+
+function getNextBillNo() {
+    const numbers = allBills
+        .map(b => getBillNoNumber(b.billNo))
+        .filter(n => Number.isFinite(n));
+    const max = numbers.length ? Math.max(...numbers) : 0;
+    return max + 1;
+}
+
 // Load bills
 async function loadBills() {
     try {
         const response = await fetch(`${API_URL}/bills`);
         if (response.ok) {
             allBills = await response.json();
+            sortBillsInPlace();
             displayBills();
             
             // Set max date to today for billing date filter
@@ -2246,9 +2281,11 @@ function displayBills() {
         return;
     }
 
-    tbody.innerHTML = allBills.map((bill, index) => `
+    tbody.innerHTML = allBills.map((bill) => {
+        const displayNo = bill.billNo ?? '';
+        return `
         <tr>
-            <td><strong>#${index + 1}</strong></td>
+            <td><strong>#${displayNo}</strong></td>
             <td>${new Date(bill.date).toLocaleDateString()}</td>
             <td>${bill.customerName}</td>
             <td>${bill.contactNo}</td>
@@ -2260,7 +2297,8 @@ function displayBills() {
                 <button onclick="deleteBill('${bill._id}')" class="btn-delete">Delete</button>
             </td>
         </tr>
-    `).join('');
+    `;
+    }).join('');
 }
 
 // Open bill modal
@@ -2269,9 +2307,8 @@ function openBillModal() {
     document.getElementById('billModalTitle').textContent = 'Create New Bill';
     document.getElementById('billForm').reset();
     
-    // Generate serial number based on current bills count
-    const serialNo = allBills.length + 1;
-    document.getElementById('billNo').value = serialNo;
+    // Generate serial number based on max existing bill no
+    document.getElementById('billNo').value = getNextBillNo();
     
     // Set today's date
     const today = new Date().toISOString().split('T')[0];
@@ -2293,12 +2330,16 @@ function filterBills() {
     
     // Filter by bill number (serial number)
     if (searchNumber) {
-        const searchIndex = parseInt(searchNumber) - 1; // Convert to 0-based index
-        if (searchIndex >= 0 && searchIndex < allBills.length) {
-            filteredBills = [allBills[searchIndex]];
-        } else {
-            filteredBills = [];
-        }
+        const queryNum = getBillNoNumber(searchNumber);
+        filteredBills = filteredBills.filter(bill => {
+            const billNoStr = String(bill.billNo ?? '').trim();
+            if (!billNoStr) return false;
+            if (Number.isFinite(queryNum)) {
+                const billNoNum = getBillNoNumber(billNoStr);
+                return Number.isFinite(billNoNum) ? billNoNum === queryNum : billNoStr === searchNumber;
+            }
+            return billNoStr === searchNumber;
+        });
     }
     
     // Filter by specific date
@@ -2319,10 +2360,10 @@ function filterBills() {
     }
     
     tbody.innerHTML = filteredBills.map((bill) => {
-        const originalIndex = allBills.findIndex(b => b._id === bill._id);
+        const displayNo = bill.billNo ?? '';
         return `
         <tr>
-            <td><strong>#${originalIndex + 1}</strong></td>
+            <td><strong>#${displayNo}</strong></td>
             <td>${new Date(bill.date).toLocaleDateString()}</td>
             <td>${bill.customerName}</td>
             <td>${bill.contactNo}</td>
@@ -2438,6 +2479,23 @@ function editBill(billId) {
 function viewBill(billId) {
     const bill = allBills.find(b => b._id === billId);
     if (!bill) return;
+
+    const formatDateIN = (dateValue) => {
+        if (!dateValue) return '';
+        const date = new Date(dateValue);
+        if (Number.isNaN(date.getTime())) return '';
+        return date.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+    };
+
+    const formatINR = (value) => {
+        const number = Number(value);
+        if (!Number.isFinite(number)) return '0';
+        return number.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+    };
+
+    const totalAmount = Number(bill.totalAmount) || 0;
+    const advance = Number(bill.advance) || 0;
+    const computedBalance = totalAmount - advance;
     
     // Create a printable view
     const printWindow = window.open('', '_blank');
@@ -2453,7 +2511,7 @@ function viewBill(billId) {
                     padding: 20px 30px; 
                     max-width: 210mm;
                     margin: 0 auto;
-                    font-size: 12px;
+                    font-size: 11px;
                     line-height: 1.4;
                 }
                 
@@ -2464,7 +2522,14 @@ function viewBill(billId) {
                     align-items: flex-start;
                     margin-bottom: 15px;
                     padding-bottom: 15px;
-                    border-bottom: 3px double #333;
+                }
+                .company-sep {
+                    height: 0;
+                    border-top: 1px solid #333;
+                    margin-top: 10px;
+                }
+                .company-sep + .company-sep {
+                    margin-top: 3px;
                 }
                 .company-left {
                     flex: 1;
@@ -2482,22 +2547,58 @@ function viewBill(billId) {
                     font-size: 20px;
                     font-weight: bold;
                     color: #1e40af;
-                    margin-bottom: 5px;
+                    letter-spacing: 1px;
+                }
+                .company-sub {
+                    font-size: 18px;
+                    font-weight: bold;
+                    color: #1e40af;
+                    margin-top: 2px;
                     letter-spacing: 1px;
                 }
                 .bus-icon {
-                    font-size: 24px;
-                    color: #ea580c;
-                    margin-bottom: 5px;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin: 2px auto 6px;
                 }
+                .bus {
+                    width: 26px;
+                    height: 12px;
+                    background: #ea580c;
+                    border-radius: 2px;
+                    position: relative;
+                }
+                .bus .w {
+                    width: 5px;
+                    height: 4px;
+                    background: #fff;
+                    position: absolute;
+                    top: 3px;
+                }
+                .bus .w1 { left: 4px; }
+                .bus .w2 { left: 10px; }
+                .bus .w3 { left: 16px; }
+                .bus:before,
+                .bus:after {
+                    content: '';
+                    width: 4px;
+                    height: 4px;
+                    background: #333;
+                    border-radius: 50%;
+                    position: absolute;
+                    bottom: -6px;
+                }
+                .bus:before { left: 5px; }
+                .bus:after { right: 5px; }
                 .company-info {
-                    font-size: 10px;
+                    font-size: 9px;
                     color: #444;
                     line-height: 1.6;
                 }
                 .contact-numbers {
-                    font-size: 11px;
-                    font-weight: 600;
+                    font-size: 9px;
+                    font-weight: 700;
                     color: #333;
                     line-height: 1.8;
                 }
@@ -2506,17 +2607,16 @@ function viewBill(billId) {
                 .bill-header {
                     text-align: center;
                     margin: 15px 0;
-                    padding: 8px;
-                    background: linear-gradient(to right, #dbeafe, #fce7f3);
-                    border-radius: 5px;
+                    padding: 12px;
+                    background: #dbeafe;
                 }
                 .bill-header h2 {
-                    font-size: 16px;
+                    font-size: 14px;
                     color: #1e40af;
                     margin-bottom: 5px;
                 }
                 .bill-info {
-                    font-size: 11px;
+                    font-size: 9px;
                     color: #555;
                 }
                 
@@ -2525,7 +2625,7 @@ function viewBill(billId) {
                     margin: 12px 0;
                 }
                 .section-title {
-                    font-size: 13px;
+                    font-size: 11px;
                     font-weight: bold;
                     color: #1e40af;
                     border-bottom: 2px solid #ddd;
@@ -2543,12 +2643,12 @@ function viewBill(billId) {
                 .field-label {
                     font-weight: 600;
                     color: #555;
-                    font-size: 11px;
+                    font-size: 9px;
                 }
                 .field-value {
                     color: #000;
                     margin-top: 2px;
-                    font-size: 11px;
+                    font-size: 10px;
                 }
                 
                 /* Billing Summary */
@@ -2557,13 +2657,13 @@ function viewBill(billId) {
                     padding: 12px;
                     margin: 12px 0;
                     border: 2px solid #1e40af;
-                    border-radius: 5px;
+                    border-radius: 0;
                 }
                 .summary-row {
                     display: flex;
                     justify-content: space-between;
                     margin: 5px 0;
-                    font-size: 11px;
+                    font-size: 9px;
                 }
                 .summary-label {
                     font-weight: 600;
@@ -2577,7 +2677,7 @@ function viewBill(billId) {
                     margin-top: 10px;
                     padding-top: 10px;
                     border-top: 2px solid #1e40af;
-                    font-size: 14px;
+                    font-size: 11px;
                 }
                 .grand-total-row .summary-label,
                 .grand-total-row .summary-value {
@@ -2586,7 +2686,7 @@ function viewBill(billId) {
                 }
                 .amount-words {
                     margin-top: 8px;
-                    font-size: 10px;
+                    font-size: 8px;
                     font-style: italic;
                     color: #666;
                     text-align: center;
@@ -2598,7 +2698,7 @@ function viewBill(billId) {
                     padding: 10px;
                     margin: 12px 0;
                     border-left: 4px solid #f59e0b;
-                    font-size: 10px;
+                    font-size: 8px;
                 }
                 .terms strong {
                     color: #b45309;
@@ -2616,7 +2716,7 @@ function viewBill(billId) {
                     margin-top: 15px;
                     padding-top: 10px;
                     border-top: 2px solid #ddd;
-                    font-size: 11px;
+                    font-size: 9px;
                     color: #666;
                 }
                 
@@ -2645,10 +2745,18 @@ function viewBill(billId) {
                 </div>
                 
                 <div class="company-center">
-                    <div class="bus-icon">🚌</div>
-                    <div class="company-name">PAVAN KRISHNA TRAVELS (GOUD)</div>
+                    <div class="bus-icon">
+                        <div class="bus">
+                            <span class="w w1"></span>
+                            <span class="w w2"></span>
+                            <span class="w w3"></span>
+                        </div>
+                    </div>
+                    <div class="company-name">PAVAN KRISHNA TRAVELS</div>
+                    <div class="company-sub">(GOUD)</div>
                     <div class="company-info">
-                        Shop No. 3-3-158/1, Enugulagadda, Chowrastha, HANAMKONDA
+                        Shop No. 3-3-158/1, Enugulagadda,<br>
+                        Chowrastha, HANAMKONDA
                     </div>
                 </div>
                 
@@ -2660,12 +2768,14 @@ function viewBill(billId) {
                     </div>
                 </div>
             </div>
+            <div class="company-sep"></div>
+            <div class="company-sep"></div>
             
             <!-- Bill Header -->
             <div class="bill-header">
                 <h2>TRAVEL BILL</h2>
                 <div class="bill-info">
-                    Bill No: <strong>${bill.billNo}</strong> | Date: <strong>${new Date(bill.date).toLocaleDateString('en-IN')}</strong>
+                    Bill No: <strong>${bill.billNo}</strong> | Date: <strong>${formatDateIN(bill.date)}</strong>
                 </div>
             </div>
             
@@ -2710,11 +2820,11 @@ function viewBill(billId) {
                 <div class="row">
                     <div class="col">
                         <div class="field-label">From:</div>
-                        <div class="field-value">${new Date(bill.dateFrom).toLocaleDateString('en-IN')} ${bill.timeFrom}</div>
+                        <div class="field-value">${formatDateIN(bill.dateFrom)}</div>
                     </div>
                     <div class="col">
                         <div class="field-label">To:</div>
-                        <div class="field-value">${new Date(bill.dateTo).toLocaleDateString('en-IN')} ${bill.timeTo}</div>
+                        <div class="field-value">${formatDateIN(bill.dateTo)}</div>
                     </div>
                 </div>
             </div>
@@ -2724,31 +2834,31 @@ function viewBill(billId) {
                 <div class="section-title" style="border: none; margin-bottom: 10px;">Billing Summary</div>
                 <div class="summary-row">
                     <span class="summary-label">Rate per KM:</span>
-                    <span class="summary-value">₹${bill.ratePerKm}</span>
+                    <span class="summary-value">Rs. ${formatINR(bill.ratePerKm)}</span>
                 </div>
                 <div class="summary-row">
                     <span class="summary-label">Total Amount:</span>
-                    <span class="summary-value">₹${parseFloat(bill.totalAmount).toLocaleString('en-IN')}</span>
+                    <span class="summary-value">Rs. ${formatINR(totalAmount)}</span>
                 </div>
                 <div class="summary-row">
                     <span class="summary-label">Advance Paid:</span>
-                    <span class="summary-value">₹${parseFloat(bill.advance).toLocaleString('en-IN')}</span>
+                    <span class="summary-value">Rs. ${formatINR(advance)}</span>
                 </div>
                 <div class="summary-row">
                     <span class="summary-label">Balance:</span>
-                    <span class="summary-value">₹${(parseFloat(bill.totalAmount) - parseFloat(bill.advance)).toLocaleString('en-IN')}</span>
+                    <span class="summary-value">Rs. ${formatINR(computedBalance)}</span>
                 </div>
                 <div class="summary-row">
                     <span class="summary-label">Driver Batta:</span>
-                    <span class="summary-value">₹${parseFloat(bill.driverBatta).toLocaleString('en-IN')}</span>
+                    <span class="summary-value">Rs. ${formatINR(bill.driverBatta)}</span>
                 </div>
                 <div class="summary-row">
                     <span class="summary-label">Extra Charges:</span>
-                    <span class="summary-value">₹${parseFloat(bill.extraCharges || 0).toLocaleString('en-IN')}</span>
+                    <span class="summary-value">Rs. ${formatINR(bill.extraCharges || 0)}</span>
                 </div>
                 <div class="summary-row grand-total-row">
                     <span class="summary-label">Grand Total:</span>
-                    <span class="summary-value">₹${parseFloat(bill.grandTotal).toLocaleString('en-IN')}</span>
+                    <span class="summary-value">Rs. ${formatINR(bill.grandTotal)}</span>
                 </div>
                 <div class="amount-words">${bill.amountWords}</div>
             </div>
@@ -2844,6 +2954,17 @@ async function emailBill(billId) {
 // Handle bill form submission
 document.getElementById('billForm')?.addEventListener('submit', async function(e) {
     e.preventDefault();
+
+    // Ensure computed fields are populated even if user didn't trigger oninput
+    try { calculateBillTotal(); } catch (_) {}
+
+    const totalAmountNum = parseFloat(document.getElementById('billTotalAmount').value) || 0;
+    const advanceNum = parseFloat(document.getElementById('billAdvance').value) || 0;
+    const driverBattaNum = parseFloat(document.getElementById('billDriverBatta').value) || 0;
+    const extraChargesNum = parseFloat(document.getElementById('billExtraCharges').value) || 0;
+    const balanceNum = (Number.isFinite(totalAmountNum) ? totalAmountNum : 0) - (Number.isFinite(advanceNum) ? advanceNum : 0);
+    const grandTotalNum = (Number.isFinite(totalAmountNum) ? totalAmountNum : 0) + (Number.isFinite(driverBattaNum) ? driverBattaNum : 0) + (Number.isFinite(extraChargesNum) ? extraChargesNum : 0);
+    const amountWordsValue = document.getElementById('billAmountWords').value || numberToWords(grandTotalNum);
     
     const billData = {
         billNo: document.getElementById('billNo').value,
@@ -2858,13 +2979,13 @@ document.getElementById('billForm')?.addEventListener('submit', async function(e
         dateFrom: document.getElementById('billDateFrom').value,
         dateTo: document.getElementById('billDateTo').value,
         ratePerKm: parseFloat(document.getElementById('billRatePerKm').value),
-        totalAmount: parseFloat(document.getElementById('billTotalAmount').value),
-        amountWords: document.getElementById('billAmountWords').value,
-        advance: parseFloat(document.getElementById('billAdvance').value),
-        balance: parseFloat(document.getElementById('billBalance').value),
-        driverBatta: parseFloat(document.getElementById('billDriverBatta').value),
-        extraCharges: parseFloat(document.getElementById('billExtraCharges').value) || 0,
-        grandTotal: parseFloat(document.getElementById('billGrandTotal').value),
+        totalAmount: totalAmountNum,
+        amountWords: amountWordsValue,
+        advance: advanceNum,
+        balance: balanceNum,
+        driverBatta: driverBattaNum,
+        extraCharges: extraChargesNum,
+        grandTotal: grandTotalNum,
         routeDetails: document.getElementById('billRouteDetails').value
     };
     
@@ -2889,11 +3010,16 @@ document.getElementById('billForm')?.addEventListener('submit', async function(e
             closeBillModal();
             loadBills();
         } else {
-            throw new Error('Failed to save bill');
+            let message = 'Failed to save bill';
+            try {
+                const errorBody = await response.json();
+                message = errorBody?.error || message;
+            } catch (_) {}
+            throw new Error(message);
         }
     } catch (error) {
         console.error('Error saving bill:', error);
-        alert('Error saving bill');
+        alert(`Error saving bill: ${error.message}`);
     }
 });
 
@@ -2908,6 +3034,17 @@ async function saveAndEmailBill() {
     
     const confirmSend = confirm(`Send bill to ${billCustomerEmail}?`);
     if (!confirmSend) return;
+
+    // Ensure computed fields are populated even if user didn't trigger oninput
+    try { calculateBillTotal(); } catch (_) {}
+
+    const totalAmountNum = parseFloat(document.getElementById('billTotalAmount').value) || 0;
+    const advanceNum = parseFloat(document.getElementById('billAdvance').value) || 0;
+    const driverBattaNum = parseFloat(document.getElementById('billDriverBatta').value) || 0;
+    const extraChargesNum = parseFloat(document.getElementById('billExtraCharges').value) || 0;
+    const balanceNum = (Number.isFinite(totalAmountNum) ? totalAmountNum : 0) - (Number.isFinite(advanceNum) ? advanceNum : 0);
+    const grandTotalNum = (Number.isFinite(totalAmountNum) ? totalAmountNum : 0) + (Number.isFinite(driverBattaNum) ? driverBattaNum : 0) + (Number.isFinite(extraChargesNum) ? extraChargesNum : 0);
+    const amountWordsValue = document.getElementById('billAmountWords').value || numberToWords(grandTotalNum);
     
     // First save the bill
     const billData = {
@@ -2923,13 +3060,13 @@ async function saveAndEmailBill() {
         dateFrom: document.getElementById('billDateFrom').value,
         dateTo: document.getElementById('billDateTo').value,
         ratePerKm: parseFloat(document.getElementById('billRatePerKm').value),
-        totalAmount: parseFloat(document.getElementById('billTotalAmount').value),
-        amountWords: document.getElementById('billAmountWords').value,
-        advance: parseFloat(document.getElementById('billAdvance').value),
-        balance: parseFloat(document.getElementById('billBalance').value),
-        driverBatta: parseFloat(document.getElementById('billDriverBatta').value),
-        extraCharges: parseFloat(document.getElementById('billExtraCharges').value) || 0,
-        grandTotal: parseFloat(document.getElementById('billGrandTotal').value),
+        totalAmount: totalAmountNum,
+        amountWords: amountWordsValue,
+        advance: advanceNum,
+        balance: balanceNum,
+        driverBatta: driverBattaNum,
+        extraCharges: extraChargesNum,
+        grandTotal: grandTotalNum,
         routeDetails: document.getElementById('billRouteDetails').value
     };
     
@@ -2958,7 +3095,12 @@ async function saveAndEmailBill() {
         }
         
         if (!response.ok) {
-            throw new Error('Failed to save bill');
+            let message = 'Failed to save bill';
+            try {
+                const errorBody = await response.json();
+                message = errorBody?.error || message;
+            } catch (_) {}
+            throw new Error(message);
         }
         
         // Now send email
