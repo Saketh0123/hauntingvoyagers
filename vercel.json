@@ -1,6 +1,13 @@
 {
   "version": 2,
   "cleanUrls": true,
+  "functions": {
+    "api/**/*.{js,ts}": {
+      "runtime": "nodejs20.x",
+      "memory": 1536,
+      "maxDuration": 60
+    }
+  },
   "headers": [
     {
       "source": "/api/(.*)",

@@ -6,6 +6,9 @@ const nodemailer = require('nodemailer');
 // Use puppeteer-core with @sparticuz/chromium on Vercel; local fallback to system Chrome
 const puppeteer = require('puppeteer-core');
 const chromium = require('@sparticuz/chromium');
+// Ensure headless + no GPU in serverless environments
+chromium.setHeadlessMode = true;
+chromium.setGraphicsMode = false;
 require('dotenv').config();
 
 const Tour = require('./tourModel');
