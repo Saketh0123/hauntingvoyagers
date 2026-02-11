@@ -2543,6 +2543,10 @@ function viewBill(billId) {
     const advance = Number(bill.advance) || 0;
     const computedBalance = totalAmount - advance;
     const isPaidInFull = advance >= totalAmount;
+
+    const assetBaseUrl = (typeof API_URL === 'string' && /^https?:\/\//i.test(API_URL))
+        ? API_URL.replace(/\/api\/?$/, '')
+        : (typeof window !== 'undefined' ? window.location.origin : '');
     
     // Create a printable view
     const printWindow = window.open('', '_blank');
@@ -2761,11 +2765,11 @@ function viewBill(billId) {
                     <div class="company-info">
                         <strong>Prop:</strong> P. Kiran Kumar
                     </div>
-                    <img src="../assets/logo.jpeg" alt="Logo" class="company-logo">
+                    <img src="${assetBaseUrl}/assets/logo.jpeg" alt="Logo" class="company-logo">
                 </div>
                 
                 <div class="company-center">
-                    <img src="../assets/logo2.jpeg" alt="PAVANKRISHNA TRAVELS - Psquare Holidays" class="company-center-logo">
+                    <img src="${assetBaseUrl}/assets/logo2.jpeg" alt="PAVANKRISHNA TRAVELS - Psquare Holidays" class="company-center-logo">
                     <div class="company-info">
                         Shop No. 3-3-158/1, Enugulagadda,<br>
                         Chowrastha, HANAMKONDA
@@ -3393,6 +3397,10 @@ function viewTourBill(billId) {
             </div>`;
     }
 
+    const assetBaseUrl = (typeof API_URL === 'string' && /^https?:\/\//i.test(API_URL))
+        ? API_URL.replace(/\/api\/?$/, '')
+        : (typeof window !== 'undefined' ? window.location.origin : '');
+
     const printWindow = window.open('', '_blank');
     printWindow.document.write(`<!DOCTYPE html><html><head><title>Tour Bill - ${bill.billNo}</title>
         <style>
@@ -3434,10 +3442,10 @@ function viewTourBill(billId) {
             <div class="company-header">
                 <div class="company-left">
                     <div class="company-info"><strong>Prop:</strong> P. Kiran Kumar</div>
-                    <img src="../assets/logo.jpeg" alt="Logo" class="company-logo">
+                    <img src="${assetBaseUrl}/assets/logo.jpeg" alt="Logo" class="company-logo">
                 </div>
                 <div class="company-center">
-                    <img src="../assets/logo2.jpeg" alt="PAVANKRISHNA TRAVELS" class="company-center-logo">
+                    <img src="${assetBaseUrl}/assets/logo2.jpeg" alt="PAVANKRISHNA TRAVELS" class="company-center-logo">
                     <div class="company-info">Shop No. 3-3-158/1, Enugulagadda,<br>Chowrastha, HANAMKONDA</div>
                 </div>
                 <div class="company-right">
