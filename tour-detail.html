@@ -4131,8 +4131,16 @@ h1, h2, h3, h4, h5, h6 {
             }
           }
           
-          // Update available dates
+          // Update available dates (filter expired dates)
           if (tour.availableDates && tour.availableDates.length > 0) {
+            // Filter out past dates
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const upcomingDates = tour.availableDates.filter(dateSlot => {
+              const dateObj = dateSlot.startDate ? new Date(dateSlot.startDate) : null;
+              return dateObj && dateObj >= today;
+            });
+
             // Find the Available Dates section by its heading
             const headings = Array.from(document.querySelectorAll('.font-semibold.tracking-tight.text-lg'));
             const datesHeading = headings.find(h => h.textContent.trim() === 'Available Dates');
@@ -4141,18 +4149,48 @@ h1, h2, h3, h4, h5, h6 {
               if (datesCard) {
                 const datesContainer = datesCard.querySelector('.space-y-2');
                 if (datesContainer) {
-                  const formattedDates = tour.availableDates.map(dateSlot => {
-                    const startDate = new Date(dateSlot.startDate);
-                    const formatOptions = { month: 'long', day: 'numeric', year: 'numeric' };
-                    return `
-                      <div class="flex items-center gap-2 text-sm text-gray-700 bg-gray-50 p-3 rounded-lg">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calendar h-4 w-4 text-orange-600" aria-hidden="true"><path d="M8 2v4"></path><path d="M16 2v4"></path><rect width="18" height="18" x="3" y="4" rx="2"></rect><path d="M3 10h18"></path></svg>
-                        <span>${startDate.toLocaleDateString('en-US', formatOptions)}</span>
+                  if (upcomingDates.length === 0) {
+                    // Show professional message when no dates available
+                    datesContainer.innerHTML = `
+                      <div class="text-center py-6 px-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-3 text-orange-500 opacity-70"><path d="M8 2v4"></path><path d="M16 2v4"></path><rect width="18" height="18" x="3" y="4" rx="2"></rect><path d="M3 10h18"></path><path d="m9 16 2 2 4-4"></path></svg>
+                        <p class="text-gray-600 font-medium mb-1">New Dates Coming Soon!</p>
+                        <p class="text-sm text-gray-500">We're currently planning our next departures for this destination. Check back soon or contact us for custom dates.</p>
                       </div>
                     `;
-                  }).join('');
-                  datesContainer.innerHTML = formattedDates;
+                  } else {
+                    const formattedDates = upcomingDates.map(dateSlot => {
+                      const startDate = new Date(dateSlot.startDate);
+                      const formatOptions = { month: 'long', day: 'numeric', year: 'numeric' };
+                      return `
+                        <div class="flex items-center gap-2 text-sm text-gray-700 bg-gray-50 p-3 rounded-lg">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calendar h-4 w-4 text-orange-600" aria-hidden="true"><path d="M8 2v4"></path><path d="M16 2v4"></path><rect width="18" height="18" x="3" y="4" rx="2"></rect><path d="M3 10h18"></path></svg>
+                          <span>${startDate.toLocaleDateString('en-US', formatOptions)}</span>
+                        </div>
+                      `;
+                    }).join('');
+                    datesContainer.innerHTML = formattedDates;
+                  }
                   console.log('✓ Updated available dates');
+                }
+              }
+            }
+          } else {
+            // No dates at all in tour data
+            const headings = Array.from(document.querySelectorAll('.font-semibold.tracking-tight.text-lg'));
+            const datesHeading = headings.find(h => h.textContent.trim() === 'Available Dates');
+            if (datesHeading) {
+              const datesCard = datesHeading.closest('.rounded-xl');
+              if (datesCard) {
+                const datesContainer = datesCard.querySelector('.space-y-2');
+                if (datesContainer) {
+                  datesContainer.innerHTML = `
+                    <div class="text-center py-6 px-4">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-3 text-orange-500 opacity-70"><path d="M8 2v4"></path><path d="M16 2v4"></path><rect width="18" height="18" x="3" y="4" rx="2"></rect><path d="M3 10h18"></path><path d="m9 16 2 2 4-4"></path></svg>
+                      <p class="text-gray-600 font-medium mb-1">New Dates Coming Soon!</p>
+                      <p class="text-sm text-gray-500">We're currently planning our next departures for this destination. Check back soon or contact us for custom dates.</p>
+                    </div>
+                  `;
                 }
               }
             }

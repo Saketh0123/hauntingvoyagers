@@ -17,3 +17,7 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Local/temporary exports
+WhatsApp Image*.jpg
+WhatsApp Image*.jpeg

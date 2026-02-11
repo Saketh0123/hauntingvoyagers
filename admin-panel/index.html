@@ -37,6 +37,26 @@
         
         .sidebar-nav {
             padding: 25px 0;
+            max-height: calc(100vh - 200px);
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+        
+        .sidebar-nav::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .sidebar-nav::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .sidebar-nav::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+        }
+        
+        .sidebar-nav::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
         }
         
         .nav-item {
@@ -509,6 +529,10 @@
                     <span class="nav-icon">🧾</span>
                     <span>Bills</span>
                 </div>
+                <div class="nav-item" onclick="showView('tourBills')">
+                    <span class="nav-icon">🏝️</span>
+                    <span>Bill (Tours)</span>
+                </div>
                 <div class="nav-item" onclick="showView('home')">
                     <span class="nav-icon">🏠</span>
                     <span>Home Settings</span>
@@ -526,7 +550,7 @@
                     <span>Duration</span>
                 </div>
             </nav>
-            <div style="position: absolute; bottom: 20px; left: 0; right: 0; padding: 0 25px;">
+            <div style="position: absolute; bottom: 20px; left: 0; right: 0; padding: 0 25px; height: 42px;">
                 <button onclick="logout()" class="w-full py-2 bg-red-500 text-white rounded-lg hover:bg-red-600">
                     Logout
                 </button>
@@ -840,6 +864,53 @@
                         <tbody id="billsTableBody">
                             <tr>
                                 <td colspan="7" class="text-center py-8 text-gray-500">No bills created yet</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tour Bills View -->
+            <div id="tourBillsView" class="view-content hidden">
+                <div class="content-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h1>Tour Bill Management</h1>
+                    <button class="btn-primary" onclick="openTourBillModal()">
+                        <span>+ Create Tour Bill</span>
+                    </button>
+                </div>
+                
+                <!-- Search Filters -->
+                <div style="display: flex; gap: 15px; margin-bottom: 20px; align-items: flex-end;">
+                    <div class="form-group" style="flex: 1; margin: 0;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 500;">Search by Bill Number</label>
+                        <input type="number" id="tourBillSearchInput" placeholder="Enter bill serial number" 
+                               style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px;"
+                               oninput="filterTourBills()">
+                    </div>
+                    <div class="form-group" style="flex: 1; margin: 0;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 500;">Billing Date</label>
+                        <input type="date" id="tourBillFilterDate" 
+                               style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px;"
+                               onchange="filterTourBills()">
+                    </div>
+                    <button onclick="clearTourBillFilters()" style="padding: 10px 20px; margin: 0; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;">Clear Filters</button>
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Bill No</th>
+                                <th>Date</th>
+                                <th>Customer</th>
+                                <th>Tour</th>
+                                <th>Persons</th>
+                                <th>Grand Total</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tourBillsTableBody">
+                            <tr>
+                                <td colspan="7" class="text-center py-8 text-gray-500">No tour bills created yet</td>
                             </tr>
                         </tbody>
                     </table>
@@ -1313,6 +1384,158 @@
                         <button type="button" onclick="closeBillModal()" class="btn-secondary">Cancel</button>
                         <button type="submit" class="btn-primary">Save Bill</button>
                         <button type="button" onclick="saveAndEmailBill()" class="btn-primary" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                            📧 Save & Email to Customer
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tour Bill Modal -->
+    <div id="tourBillModal" class="modal">
+        <div class="modal-content" style="max-width: 1000px;">
+            <div class="modal-header">
+                <h3 id="tourBillModalTitle">Create Tour Bill</h3>
+                <button class="modal-close" onclick="closeTourBillModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="tourBillForm">
+                    <input type="hidden" id="tourBillId">
+                    
+                    <!-- Bill Details -->
+                    <div class="mb-6">
+                        <h4 class="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">Bill Details</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label>Bill No *</label>
+                                <input type="text" id="tbBillNo" required placeholder="Auto-generated">
+                            </div>
+                            <div class="form-group">
+                                <label>Date *</label>
+                                <input type="date" id="tbDate" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Customer Details -->
+                    <div class="mb-6">
+                        <h4 class="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">Customer Details</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label>Customer Name *</label>
+                                <input type="text" id="tbCustomerName" required placeholder="Full name">
+                            </div>
+                            <div class="form-group">
+                                <label>Contact Number *</label>
+                                <input type="tel" id="tbContactNo" required placeholder="Phone number">
+                            </div>
+                            <div class="form-group">
+                                <label>Customer Email *</label>
+                                <input type="email" id="tbCustomerEmail" required placeholder="customer@example.com">
+                            </div>
+                            <div class="form-group">
+                                <label>Number of Persons *</label>
+                                <input type="number" id="tbPersons" required placeholder="No. of persons" min="1" oninput="calculateTourBillTotal()">
+                            </div>
+                            <div class="form-group md:col-span-2">
+                                <label>Address *</label>
+                                <textarea id="tbAddress" required rows="2" placeholder="Complete address"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tour Details -->
+                    <div class="mb-6">
+                        <h4 class="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">Tour Details</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label>Tour Name *</label>
+                                <select id="tbTourSelect" required onchange="onTourSelected()">
+                                    <option value="">-- Select a Tour --</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Destination *</label>
+                                <input type="text" id="tbDestination" required placeholder="Auto-filled from tour">
+                            </div>
+                            <div class="form-group">
+                                <label>Duration *</label>
+                                <input type="text" id="tbDuration" required placeholder="e.g., 5 Days">
+                            </div>
+                            <div class="form-group">
+                                <label>Date From *</label>
+                                <input type="date" id="tbDateFrom" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Date To *</label>
+                                <input type="date" id="tbDateTo" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Itinerary -->
+                    <div class="mb-6">
+                        <h4 class="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">Itinerary</h4>
+                        <div id="tbItineraryInputs" class="space-y-3"></div>
+                        <button type="button" onclick="addTourBillItineraryDay()" class="mt-2 px-3 py-1 bg-gray-200 rounded text-sm">+ Add Day</button>
+                    </div>
+
+                    <!-- Pricing Details -->
+                    <div class="mb-6">
+                        <h4 class="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">Pricing Details</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label>Price per Person *</label>
+                                <input type="number" id="tbPricePerPerson" required placeholder="Price per person" step="0.01" oninput="calculateTourBillTotal()">
+                            </div>
+                            <div class="form-group">
+                                <label>Total Amount *</label>
+                                <input type="number" id="tbTotalAmount" required placeholder="Auto-calculated" step="0.01" oninput="calculateTourBillTotal()">
+                            </div>
+                            <div class="form-group md:col-span-2">
+                                <label>Amount in Words</label>
+                                <input type="text" id="tbAmountWords" readonly placeholder="Auto-calculated">
+                            </div>
+                            <div class="form-group">
+                                <label>Advance Paid *</label>
+                                <input type="number" id="tbAdvance" required placeholder="Advance amount" step="0.01" value="0" oninput="calculateTourBillTotal()">
+                            </div>
+                            <div class="form-group">
+                                <label>Balance Amount</label>
+                                <input type="number" id="tbBalance" readonly placeholder="Auto-calculated">
+                            </div>
+                            <div class="form-group">
+                                <label>Extra Charges</label>
+                                <input type="number" id="tbExtraCharges" placeholder="Additional charges" step="0.01" value="0" oninput="calculateTourBillTotal()">
+                            </div>
+                            <div class="form-group">
+                                <label style="font-weight: 700; font-size: 1.1rem; color: #1e40af;">Grand Total</label>
+                                <input type="number" id="tbGrandTotal" readonly style="font-weight: 700; font-size: 1.3rem; color: #1e40af; background: #dbeafe;" placeholder="Auto-calculated">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Terms & Notes -->
+                    <div class="mb-6">
+                        <h4 class="text-lg font-semibold mb-4 text-gray-700 border-b pb-2">Terms & Additional Notes</h4>
+                        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+                            <p class="text-sm text-gray-700 font-semibold mb-2">Important Terms:</p>
+                            <ul class="text-sm text-gray-600 space-y-1 ml-4">
+                                <li>• Parking, Tollgates, Check Post, R.T.O, and State Taxes will be paid by the party</li>
+                                <li>• Hyderabad entrance tax paid by party only</li>
+                            </ul>
+                        </div>
+                        <div class="form-group">
+                            <label>Route Details / Remarks</label>
+                            <textarea id="tbRouteDetails" rows="4" placeholder="Enter route details or additional remarks"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" onclick="closeTourBillModal()" class="btn-secondary">Cancel</button>
+                        <button type="submit" class="btn-primary">Save Tour Bill</button>
+                        <button type="button" onclick="saveAndEmailTourBill()" class="btn-primary" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
                             📧 Save & Email to Customer
                         </button>
                     </div>

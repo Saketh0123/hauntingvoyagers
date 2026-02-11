@@ -2,10 +2,10 @@
   "name": "pawan-krishna-travels",
   "version": "1.0.0",
   "description": "Travel agency website with dynamic content management",
-  "main": "api/index.js",
+  "main": "server.js",
   "scripts": {
-    "dev": "node api/server.js",
-    "start": "node api/server.js"
+    "dev": "node server.js",
+    "start": "node server.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -306,6 +306,7 @@ function showView(viewName) {
         'travells': 'Vehicle Rentals Management',
         'bookings': 'Booking Requests',
         'bills': 'Bill Management',
+        'tourBills': 'Tour Bill Management',
         'dates': 'Available Dates Management',
         'pricing': 'Tour Pricing Overview',
         'duration': 'Tour Durations'
@@ -336,6 +337,9 @@ function showView(viewName) {
     } else if (viewName === 'bills') {
         document.getElementById('billsView').classList.remove('hidden');
         loadBills();
+    } else if (viewName === 'tourBills') {
+        document.getElementById('tourBillsView').classList.remove('hidden');
+        loadTourBills();
     } else if (viewName === 'dates') {
         document.getElementById('datesView').classList.remove('hidden');
         loadDatesView();
@@ -1594,13 +1598,29 @@ function renderTourDates(tour) {
         return '<p class="text-sm text-gray-500">No dates available</p>';
     }
     
-    // Filter out past dates
+    // Filter out past dates and auto-delete them from database
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const originalLength = tour.availableDates.length;
     const futureDates = tour.availableDates.filter(date => {
         const dateObj = date.startDate ? new Date(date.startDate) : null;
         return dateObj && dateObj >= today;
     });
+    
+    // If any dates were filtered out (expired), update the tour in database
+    if (futureDates.length < originalLength) {
+        tour.availableDates = futureDates;
+        // Silently save to database without blocking UI
+        fetch(`${API_URL}/tours/${tour._id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(tour)
+        }).then(response => {
+            if (response.ok) {
+                console.log(`Auto-deleted ${originalLength - futureDates.length} expired date(s) from ${tour.title}`);
+            }
+        }).catch(err => console.error('Error auto-deleting expired dates:', err));
+    }
     
     if (futureDates.length === 0) {
         return '<p class="text-sm text-gray-500">No upcoming dates available</p>';
@@ -2496,6 +2516,7 @@ function viewBill(billId) {
     const totalAmount = Number(bill.totalAmount) || 0;
     const advance = Number(bill.advance) || 0;
     const computedBalance = totalAmount - advance;
+    const isPaidInFull = advance >= totalAmount;
     
     // Create a printable view
     const printWindow = window.open('', '_blank');
@@ -2520,77 +2541,45 @@ function viewBill(billId) {
                     display: flex;
                     justify-content: space-between;
                     align-items: flex-start;
-                    margin-bottom: 15px;
-                    padding-bottom: 15px;
+                    margin-bottom: 0;
+                    padding-bottom: 10px;
                 }
                 .company-sep {
                     height: 0;
                     border-top: 1px solid #333;
-                    margin-top: 10px;
+                    margin-top: 0;
                 }
                 .company-sep + .company-sep {
                     margin-top: 3px;
                 }
                 .company-left {
-                    flex: 1;
+                    flex: 0 0 22%;
+                    max-width: 22%;
                 }
                 .company-center {
-                    flex: 2;
+                    flex: 0 0 56%;
+                    max-width: 56%;
                     text-align: center;
-                    padding: 0 20px;
+                    padding: 0 10px;
                 }
                 .company-right {
-                    flex: 1;
+                    flex: 0 0 22%;
+                    max-width: 22%;
                     text-align: right;
                 }
-                .company-name {
-                    font-size: 20px;
-                    font-weight: bold;
-                    color: #1e40af;
-                    letter-spacing: 1px;
+                .company-center-logo {
+                    max-width: 80%;
+                    height: auto;
+                    display: block;
+                    margin: 0 auto 6px;
                 }
-                .company-sub {
-                    font-size: 18px;
-                    font-weight: bold;
-                    color: #1e40af;
-                    margin-top: 2px;
-                    letter-spacing: 1px;
+                .company-logo {
+                    width: 100px;
+                    height: 55px;
+                    object-fit: contain;
+                    margin-top: 4px;
+                    display: block;
                 }
-                .bus-icon {
-                    display: inline-flex;
-                    align-items: center;
-                    justify-content: center;
-                    margin: 2px auto 6px;
-                }
-                .bus {
-                    width: 26px;
-                    height: 12px;
-                    background: #ea580c;
-                    border-radius: 2px;
-                    position: relative;
-                }
-                .bus .w {
-                    width: 5px;
-                    height: 4px;
-                    background: #fff;
-                    position: absolute;
-                    top: 3px;
-                }
-                .bus .w1 { left: 4px; }
-                .bus .w2 { left: 10px; }
-                .bus .w3 { left: 16px; }
-                .bus:before,
-                .bus:after {
-                    content: '';
-                    width: 4px;
-                    height: 4px;
-                    background: #333;
-                    border-radius: 50%;
-                    position: absolute;
-                    bottom: -6px;
-                }
-                .bus:before { left: 5px; }
-                .bus:after { right: 5px; }
                 .company-info {
                     font-size: 9px;
                     color: #444;
@@ -2600,20 +2589,26 @@ function viewBill(billId) {
                     font-size: 9px;
                     font-weight: 700;
                     color: #333;
-                    line-height: 1.8;
+                    line-height: 2.0;
                 }
                 
                 /* Bill Header */
                 .bill-header {
                     text-align: center;
-                    margin: 15px 0;
-                    padding: 12px;
+                    margin: 10px 0 15px;
+                    padding: 8px 12px 10px;
                     background: #dbeafe;
                 }
                 .bill-header h2 {
                     font-size: 14px;
                     color: #1e40af;
                     margin-bottom: 5px;
+                }
+                .paid-badge {
+                    font-size: 9px;
+                    font-weight: bold;
+                    color: #059669;
+                    margin: 4px 0;
                 }
                 .bill-info {
                     font-size: 9px;
@@ -2716,7 +2711,7 @@ function viewBill(billId) {
                     margin-top: 15px;
                     padding-top: 10px;
                     border-top: 2px solid #ddd;
-                    font-size: 9px;
+                    font-size: 10px;
                     color: #666;
                 }
                 
@@ -2726,8 +2721,6 @@ function viewBill(billId) {
                         padding: 15px 20px;
                         font-size: 11px;
                     }
-                    .company-name { font-size: 18px; }
-                    .bill-header h2 { font-size: 15px; }
                     @page {
                         size: A4;
                         margin: 10mm;
@@ -2742,18 +2735,11 @@ function viewBill(billId) {
                     <div class="company-info">
                         <strong>Prop:</strong> P. Kiran Kumar
                     </div>
+                    <img src="../assets/logo.jpeg" alt="Logo" class="company-logo">
                 </div>
                 
                 <div class="company-center">
-                    <div class="bus-icon">
-                        <div class="bus">
-                            <span class="w w1"></span>
-                            <span class="w w2"></span>
-                            <span class="w w3"></span>
-                        </div>
-                    </div>
-                    <div class="company-name">PAVAN KRISHNA TRAVELS</div>
-                    <div class="company-sub">(GOUD)</div>
+                    <img src="../assets/logo2.jpeg" alt="PAVANKRISHNA TRAVELS - Psquare Holidays" class="company-center-logo">
                     <div class="company-info">
                         Shop No. 3-3-158/1, Enugulagadda,<br>
                         Chowrastha, HANAMKONDA
@@ -2773,7 +2759,8 @@ function viewBill(billId) {
             
             <!-- Bill Header -->
             <div class="bill-header">
-                <h2>TRAVEL BILL</h2>
+                <h2>${isPaidInFull ? 'PAYMENT RECEIPT & INVOICE' : 'TRAVEL BILL'}</h2>
+                ${isPaidInFull ? '<div class="paid-badge">✓ PAID IN FULL</div>' : ''}
                 <div class="bill-info">
                     Bill No: <strong>${bill.billNo}</strong> | Date: <strong>${formatDateIN(bill.date)}</strong>
                 </div>
@@ -2881,7 +2868,7 @@ function viewBill(billId) {
             
             <!-- Footer -->
             <div class="footer">
-                <p><strong>Thank you for choosing PAVAN KRISHNA TRAVELS!</strong></p>
+                <p><strong>Thank you for choosing PAVANKRISHNA TRAVELS!</strong></p>
                 <p>For any queries, please contact us at the numbers mentioned above.</p>
             </div>
             
@@ -3121,6 +3108,522 @@ async function saveAndEmailBill() {
             throw new Error(error.error || 'Failed to send email');
         }
         
+    } catch (error) {
+        console.error('Error:', error);
+        alert(`Error: ${error.message}`);
+    }
+}
+
+// ============================================
+// TOUR BILL MANAGEMENT FUNCTIONS
+// ============================================
+
+let allTourBills = [];
+let editingTourBillId = null;
+let cachedTours = [];
+
+function getNextTourBillNo() {
+    const numbers = allTourBills.map(b => {
+        const n = String(b.billNo ?? '').replace(/\D/g, '');
+        return n ? parseInt(n) : 0;
+    });
+    const max = numbers.length ? Math.max(...numbers, 0) : 0;
+    return 'T' + (max + 1);
+}
+
+async function loadTourBills() {
+    try {
+        const response = await fetch(`${API_URL}/tour-bills`);
+        if (response.ok) {
+            allTourBills = await response.json();
+            allTourBills.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            displayTourBills();
+        }
+    } catch (error) {
+        console.error('Error loading tour bills:', error);
+    }
+}
+
+function displayTourBills() {
+    const tbody = document.getElementById('tourBillsTableBody');
+    if (!tbody) return;
+    if (allTourBills.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-gray-500">No tour bills created yet</td></tr>';
+        return;
+    }
+    tbody.innerHTML = allTourBills.map(bill => `
+        <tr>
+            <td><strong>#${bill.billNo ?? ''}</strong></td>
+            <td>${new Date(bill.date).toLocaleDateString()}</td>
+            <td>${bill.customerName}</td>
+            <td>${bill.tourName}</td>
+            <td>${bill.numberOfPersons}</td>
+            <td><strong style="color: #1e40af;">₹${parseFloat(bill.grandTotal).toLocaleString()}</strong></td>
+            <td>
+                <button onclick="editTourBill('${bill._id}')" class="btn-edit">Edit</button>
+                <button onclick="viewTourBill('${bill._id}')" class="btn-primary" style="margin-left:5px;">View</button>
+                <button onclick="deleteTourBill('${bill._id}')" class="btn-delete">Delete</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function filterTourBills() {
+    const searchNumber = document.getElementById('tourBillSearchInput').value.trim();
+    const selectedDate = document.getElementById('tourBillFilterDate').value;
+    let filtered = [...allTourBills];
+    if (searchNumber) filtered = filtered.filter(b => String(b.billNo ?? '').includes(searchNumber));
+    if (selectedDate) {
+        const fd = new Date(selectedDate); fd.setHours(0,0,0,0);
+        filtered = filtered.filter(b => { const d = new Date(b.date); d.setHours(0,0,0,0); return d.getTime() === fd.getTime(); });
+    }
+    const tbody = document.getElementById('tourBillsTableBody');
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-gray-500">No tour bills found</td></tr>';
+        return;
+    }
+    tbody.innerHTML = filtered.map(bill => `
+        <tr>
+            <td><strong>#${bill.billNo ?? ''}</strong></td>
+            <td>${new Date(bill.date).toLocaleDateString()}</td>
+            <td>${bill.customerName}</td>
+            <td>${bill.tourName}</td>
+            <td>${bill.numberOfPersons}</td>
+            <td><strong style="color: #1e40af;">₹${parseFloat(bill.grandTotal).toLocaleString()}</strong></td>
+            <td>
+                <button onclick="editTourBill('${bill._id}')" class="btn-edit">Edit</button>
+                <button onclick="viewTourBill('${bill._id}')" class="btn-primary" style="margin-left:5px;">View</button>
+                <button onclick="deleteTourBill('${bill._id}')" class="btn-delete">Delete</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function clearTourBillFilters() {
+    document.getElementById('tourBillSearchInput').value = '';
+    document.getElementById('tourBillFilterDate').value = '';
+    displayTourBills();
+}
+
+async function loadToursForDropdown() {
+    try {
+        const response = await fetch(`${API_URL}/tours`);
+        if (response.ok) {
+            cachedTours = await response.json();
+            const select = document.getElementById('tbTourSelect');
+            select.innerHTML = '<option value="">-- Select a Tour --</option>';
+            cachedTours.forEach(tour => {
+                select.innerHTML += `<option value="${tour._id}">${tour.title} (${tour.location})</option>`;
+            });
+        }
+    } catch (error) {
+        console.error('Error loading tours:', error);
+    }
+}
+
+function onTourSelected() {
+    const tourId = document.getElementById('tbTourSelect').value;
+    if (!tourId) return;
+    const tour = cachedTours.find(t => t._id === tourId);
+    if (!tour) return;
+
+    document.getElementById('tbDestination').value = tour.location || '';
+    document.getElementById('tbDuration').value = tour.duration || '';
+    document.getElementById('tbPricePerPerson').value = tour.price || '';
+
+    const container = document.getElementById('tbItineraryInputs');
+    container.innerHTML = '';
+    if (tour.itinerary && tour.itinerary.length > 0) {
+        tour.itinerary.forEach(item => addTourBillItineraryDay(item.day, item.title));
+    }
+    calculateTourBillTotal();
+}
+
+function addTourBillItineraryDay(day, title) {
+    const container = document.getElementById('tbItineraryInputs');
+    const count = container.children.length + 1;
+    const div = document.createElement('div');
+    div.className = 'p-3 border rounded-lg bg-gray-50 space-y-2';
+    div.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+            <strong class="text-sm text-blue-700">Day ${day || count}</strong>
+            <button type="button" onclick="this.closest('.p-3').remove()" class="px-2 py-1 bg-red-500 text-white rounded text-xs">Remove</button>
+        </div>
+        <input type="hidden" class="tb-itin-day" value="${day || count}">
+        <input type="text" class="tb-itin-title w-full px-3 py-2 border rounded" placeholder="Day title" value="${title || ''}">
+    `;
+    container.appendChild(div);
+}
+
+function calculateTourBillTotal() {
+    const pricePerPerson = parseFloat(document.getElementById('tbPricePerPerson').value) || 0;
+    const persons = parseInt(document.getElementById('tbPersons').value) || 0;
+    const advance = parseFloat(document.getElementById('tbAdvance').value) || 0;
+    const extraCharges = parseFloat(document.getElementById('tbExtraCharges').value) || 0;
+
+    const totalAmount = pricePerPerson * persons;
+    document.getElementById('tbTotalAmount').value = totalAmount.toFixed(2);
+    const balance = totalAmount - advance;
+    document.getElementById('tbBalance').value = balance.toFixed(2);
+    const grandTotal = totalAmount + extraCharges;
+    document.getElementById('tbGrandTotal').value = grandTotal.toFixed(2);
+    document.getElementById('tbAmountWords').value = numberToWords(grandTotal);
+}
+
+function openTourBillModal() {
+    editingTourBillId = null;
+    document.getElementById('tourBillModalTitle').textContent = 'Create Tour Bill';
+    document.getElementById('tourBillForm').reset();
+    document.getElementById('tbItineraryInputs').innerHTML = '';
+    document.getElementById('tbBillNo').value = getNextTourBillNo();
+    document.getElementById('tbDate').value = new Date().toISOString().split('T')[0];
+    loadToursForDropdown();
+    document.getElementById('tourBillModal').classList.add('active');
+}
+
+function closeTourBillModal() {
+    document.getElementById('tourBillModal').classList.remove('active');
+    editingTourBillId = null;
+}
+
+function collectTourBillItinerary() {
+    const items = [];
+    document.querySelectorAll('#tbItineraryInputs > div').forEach(div => {
+        const day = parseInt(div.querySelector('.tb-itin-day')?.value) || items.length + 1;
+        const title = div.querySelector('.tb-itin-title')?.value || '';
+        if (title) items.push({ day, title });
+    });
+    return items;
+}
+
+function editTourBill(billId) {
+    const bill = allTourBills.find(b => b._id === billId);
+    if (!bill) return;
+    editingTourBillId = billId;
+    document.getElementById('tourBillModalTitle').textContent = 'Edit Tour Bill';
+
+    loadToursForDropdown().then(() => {
+        if (bill.tourId) document.getElementById('tbTourSelect').value = bill.tourId;
+    });
+
+    document.getElementById('tbBillNo').value = bill.billNo;
+    document.getElementById('tbDate').value = bill.date.split('T')[0];
+    document.getElementById('tbCustomerName').value = bill.customerName;
+    document.getElementById('tbContactNo').value = bill.contactNo;
+    document.getElementById('tbCustomerEmail').value = bill.customerEmail || '';
+    document.getElementById('tbPersons').value = bill.numberOfPersons;
+    document.getElementById('tbAddress').value = bill.address;
+    document.getElementById('tbDestination').value = bill.destination;
+    document.getElementById('tbDuration').value = bill.duration;
+    document.getElementById('tbDateFrom').value = bill.dateFrom.split('T')[0];
+    document.getElementById('tbDateTo').value = bill.dateTo.split('T')[0];
+    document.getElementById('tbPricePerPerson').value = bill.pricePerPerson;
+    document.getElementById('tbTotalAmount').value = bill.totalAmount;
+    document.getElementById('tbAdvance').value = bill.advance;
+    document.getElementById('tbExtraCharges').value = bill.extraCharges || 0;
+    document.getElementById('tbRouteDetails').value = bill.routeDetails || '';
+
+    const container = document.getElementById('tbItineraryInputs');
+    container.innerHTML = '';
+    if (bill.itinerary && bill.itinerary.length > 0) {
+        bill.itinerary.forEach(item => addTourBillItineraryDay(item.day, item.title));
+    }
+    calculateTourBillTotal();
+    document.getElementById('tourBillModal').classList.add('active');
+}
+
+// View tour bill (print preview — 100% match with PDF)
+function viewTourBill(billId) {
+    const bill = allTourBills.find(b => b._id === billId);
+    if (!bill) return;
+
+    const formatDateIN = (dateValue) => {
+        if (!dateValue) return '';
+        const date = new Date(dateValue);
+        if (Number.isNaN(date.getTime())) return '';
+        return date.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+    };
+    const formatINR = (value) => {
+        const number = Number(value);
+        if (!Number.isFinite(number)) return '0';
+        return number.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+    };
+
+    const totalAmount = Number(bill.totalAmount) || 0;
+    const advance = Number(bill.advance) || 0;
+    const computedBalance = totalAmount - advance;
+    const isPaidInFull = advance >= totalAmount;
+
+    let itineraryHTML = '';
+    if (bill.itinerary && bill.itinerary.length > 0) {
+        itineraryHTML = `
+            <div class="section">
+                <div class="section-title">Itinerary</div>
+                ${bill.itinerary.map(item => `
+                    <div style="margin-bottom:4px;">
+                        <div style="font-weight:bold;font-size:9px;color:#1e40af;">Day ${item.day}: ${item.title || ''}</div>
+                    </div>
+                `).join('')}
+            </div>`;
+    }
+
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`<!DOCTYPE html><html><head><title>Tour Bill - ${bill.billNo}</title>
+        <style>
+            * { margin:0; padding:0; box-sizing:border-box; }
+            body { font-family:Arial,sans-serif; padding:20px 30px; max-width:210mm; margin:0 auto; font-size:11px; line-height:1.4; }
+            .company-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0; padding-bottom:10px; }
+            .company-sep { height:0; border-top:1px solid #333; margin-top:0; }
+            .company-sep + .company-sep { margin-top:3px; }
+            .company-left { flex:0 0 22%; max-width:22%; }
+            .company-center { flex:0 0 56%; max-width:56%; text-align:center; padding:0 10px; }
+            .company-right { flex:0 0 22%; max-width:22%; text-align:right; }
+            .company-center-logo { max-width:80%; height:auto; display:block; margin:0 auto 6px; }
+            .company-logo { width:100px; height:55px; object-fit:contain; margin-top:4px; display:block; }
+            .company-info { font-size:9px; color:#444; line-height:1.6; }
+            .contact-numbers { font-size:9px; font-weight:700; color:#333; line-height:2.0; }
+            .bill-header { text-align:center; margin:10px 0 15px; padding:8px 12px 10px; background:#dbeafe; }
+            .bill-header h2 { font-size:14px; color:#1e40af; margin-bottom:5px; }
+            .paid-badge { font-size:9px; font-weight:bold; color:#059669; margin:4px 0; }
+            .bill-info { font-size:9px; color:#555; }
+            .section { margin:12px 0; }
+            .section-title { font-size:11px; font-weight:bold; color:#1e40af; border-bottom:2px solid #ddd; padding-bottom:4px; margin-bottom:8px; }
+            .row { display:flex; gap:15px; margin:6px 0; }
+            .col { flex:1; }
+            .field-label { font-weight:600; color:#555; font-size:9px; }
+            .field-value { color:#000; margin-top:2px; font-size:10px; }
+            .billing-summary { background:#f0f9ff; padding:12px; margin:12px 0; border:2px solid #1e40af; border-radius:0; }
+            .summary-row { display:flex; justify-content:space-between; margin:5px 0; font-size:9px; }
+            .summary-label { font-weight:600; color:#555; }
+            .summary-value { font-weight:600; color:#000; }
+            .grand-total-row { margin-top:10px; padding-top:10px; border-top:2px solid #1e40af; font-size:11px; }
+            .grand-total-row .summary-label, .grand-total-row .summary-value { font-weight:bold; color:#1e40af; }
+            .amount-words { margin-top:8px; font-size:8px; font-style:italic; color:#666; text-align:center; }
+            .terms { background:#fffbeb; padding:10px; margin:12px 0; border-left:4px solid #f59e0b; font-size:8px; }
+            .terms strong { color:#b45309; display:block; margin-bottom:5px; }
+            .terms ul { margin-left:15px; line-height:1.6; }
+            .footer { text-align:center; margin-top:15px; padding-top:10px; border-top:2px solid #ddd; font-size:10px; color:#666; }
+            @media print { body { padding:15px 20px; font-size:11px; } @page { size:A4; margin:10mm; } }
+        </style></head><body>
+            <div class="company-header">
+                <div class="company-left">
+                    <div class="company-info"><strong>Prop:</strong> P. Kiran Kumar</div>
+                    <img src="../assets/logo.jpeg" alt="Logo" class="company-logo">
+                </div>
+                <div class="company-center">
+                    <img src="../assets/logo2.jpeg" alt="PAVANKRISHNA TRAVELS" class="company-center-logo">
+                    <div class="company-info">Shop No. 3-3-158/1, Enugulagadda,<br>Chowrastha, HANAMKONDA</div>
+                </div>
+                <div class="company-right">
+                    <div class="contact-numbers"><div>Cell: 98494 58582</div><div>98499 44429</div><div>98496 58850</div></div>
+                </div>
+            </div>
+            <div class="company-sep"></div><div class="company-sep"></div>
+
+            <div class="bill-header"><h2>${isPaidInFull ? 'TOUR RECEIPT & INVOICE' : 'TOUR BILL'}</h2>
+                ${isPaidInFull ? '<div class="paid-badge">✓ PAID IN FULL</div>' : ''}
+                <div class="bill-info">Bill No: <strong>${bill.billNo}</strong> | Date: <strong>${formatDateIN(bill.date)}</strong></div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Customer Details</div>
+                <div class="row">
+                    <div class="col"><div class="field-label">Name:</div><div class="field-value">${bill.customerName}</div></div>
+                    <div class="col"><div class="field-label">Contact:</div><div class="field-value">${bill.contactNo}</div></div>
+                </div>
+                <div class="row">
+                    <div class="col"><div class="field-label">Address:</div><div class="field-value">${bill.address}</div></div>
+                    <div class="col"><div class="field-label">No. of Persons:</div><div class="field-value">${bill.numberOfPersons}</div></div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Tour Details</div>
+                <div class="row">
+                    <div class="col"><div class="field-label">Tour Name:</div><div class="field-value">${bill.tourName}</div></div>
+                    <div class="col"><div class="field-label">Destination:</div><div class="field-value">${bill.destination}</div></div>
+                    <div class="col"><div class="field-label">Duration:</div><div class="field-value">${bill.duration}</div></div>
+                </div>
+                <div class="row">
+                    <div class="col"><div class="field-label">From:</div><div class="field-value">${formatDateIN(bill.dateFrom)}</div></div>
+                    <div class="col"><div class="field-label">To:</div><div class="field-value">${formatDateIN(bill.dateTo)}</div></div>
+                </div>
+            </div>
+
+            ${itineraryHTML}
+
+            <div class="billing-summary">
+                <div class="section-title" style="border:none;margin-bottom:10px;">Billing Summary</div>
+                <div class="summary-row"><span class="summary-label">Price per Person:</span><span class="summary-value">Rs. ${formatINR(bill.pricePerPerson)}</span></div>
+                <div class="summary-row"><span class="summary-label">Total Amount:</span><span class="summary-value">Rs. ${formatINR(totalAmount)}</span></div>
+                <div class="summary-row"><span class="summary-label">Advance Paid:</span><span class="summary-value">Rs. ${formatINR(advance)}</span></div>
+                <div class="summary-row"><span class="summary-label">Balance:</span><span class="summary-value">Rs. ${formatINR(computedBalance)}</span></div>
+                <div class="summary-row"><span class="summary-label">Extra Charges:</span><span class="summary-value">Rs. ${formatINR(bill.extraCharges || 0)}</span></div>
+                <div class="summary-row grand-total-row"><span class="summary-label">Grand Total:</span><span class="summary-value">Rs. ${formatINR(bill.grandTotal)}</span></div>
+                <div class="amount-words">${bill.amountWords}</div>
+            </div>
+
+            <div class="terms"><strong>Important Terms:</strong><ul>
+                <li>Parking, Tollgates, Check Post, R.T.O, and State Taxes will be paid by the party</li>
+                <li>Hyderabad entrance tax paid by party only</li>
+            </ul></div>
+
+            ${bill.routeDetails ? `<div class="section"><div class="section-title">Route Details / Remarks</div><div class="field-value">${bill.routeDetails}</div></div>` : ''}
+
+            <div class="footer">
+                <p><strong>Thank you for choosing PAVANKRISHNA TRAVELS!</strong></p>
+                <p>For any queries, please contact us at the numbers mentioned above.</p>
+            </div>
+            <script>window.onload = function() { setTimeout(() => window.print(), 500); }</script>
+        </body></html>`);
+    printWindow.document.close();
+}
+
+async function deleteTourBill(billId) {
+    if (!confirm('Are you sure you want to delete this tour bill?')) return;
+    try {
+        const response = await fetch(`${API_URL}/tour-bills/${billId}`, { method: 'DELETE' });
+        if (response.ok) { alert('Tour bill deleted!'); loadTourBills(); }
+        else throw new Error('Failed to delete');
+    } catch (error) { console.error('Error:', error); alert('Error deleting tour bill'); }
+}
+
+document.getElementById('tourBillForm')?.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    try { calculateTourBillTotal(); } catch (_) {}
+
+    const totalAmountNum = parseFloat(document.getElementById('tbTotalAmount').value) || 0;
+    const advanceNum = parseFloat(document.getElementById('tbAdvance').value) || 0;
+    const extraChargesNum = parseFloat(document.getElementById('tbExtraCharges').value) || 0;
+    const balanceNum = totalAmountNum - advanceNum;
+    const grandTotalNum = totalAmountNum + extraChargesNum;
+    const amountWordsValue = document.getElementById('tbAmountWords').value || numberToWords(grandTotalNum);
+
+    const selectedTourId = document.getElementById('tbTourSelect').value;
+    const selectedTour = cachedTours.find(t => t._id === selectedTourId);
+
+    const billData = {
+        billNo: document.getElementById('tbBillNo').value,
+        date: document.getElementById('tbDate').value,
+        customerName: document.getElementById('tbCustomerName').value,
+        contactNo: document.getElementById('tbContactNo').value,
+        customerEmail: document.getElementById('tbCustomerEmail').value,
+        numberOfPersons: parseInt(document.getElementById('tbPersons').value),
+        address: document.getElementById('tbAddress').value,
+        tourId: selectedTourId || undefined,
+        tourName: selectedTour ? selectedTour.title : document.getElementById('tbDestination').value,
+        destination: document.getElementById('tbDestination').value,
+        duration: document.getElementById('tbDuration').value,
+        dateFrom: document.getElementById('tbDateFrom').value,
+        dateTo: document.getElementById('tbDateTo').value,
+        itinerary: collectTourBillItinerary(),
+        pricePerPerson: parseFloat(document.getElementById('tbPricePerPerson').value),
+        totalAmount: totalAmountNum,
+        amountWords: amountWordsValue,
+        advance: advanceNum,
+        balance: balanceNum,
+        extraCharges: extraChargesNum,
+        grandTotal: grandTotalNum,
+        routeDetails: document.getElementById('tbRouteDetails').value
+    };
+
+    try {
+        let response;
+        if (editingTourBillId) {
+            response = await fetch(`${API_URL}/tour-bills/${editingTourBillId}`, {
+                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(billData)
+            });
+        } else {
+            response = await fetch(`${API_URL}/tour-bills`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(billData)
+            });
+        }
+        if (response.ok) {
+            alert(editingTourBillId ? 'Tour bill updated!' : 'Tour bill created!');
+            closeTourBillModal();
+            loadTourBills();
+        } else {
+            let message = 'Failed to save tour bill';
+            try { const err = await response.json(); message = err?.error || message; } catch (_) {}
+            throw new Error(message);
+        }
+    } catch (error) {
+        console.error('Error saving tour bill:', error);
+        alert(`Error: ${error.message}`);
+    }
+});
+
+async function saveAndEmailTourBill() {
+    const email = document.getElementById('tbCustomerEmail').value;
+    if (!email || !email.includes('@')) { alert('Please enter a valid customer email'); return; }
+    if (!confirm(`Send tour bill to ${email}?`)) return;
+
+    try { calculateTourBillTotal(); } catch (_) {}
+
+    const totalAmountNum = parseFloat(document.getElementById('tbTotalAmount').value) || 0;
+    const advanceNum = parseFloat(document.getElementById('tbAdvance').value) || 0;
+    const extraChargesNum = parseFloat(document.getElementById('tbExtraCharges').value) || 0;
+    const balanceNum = totalAmountNum - advanceNum;
+    const grandTotalNum = totalAmountNum + extraChargesNum;
+    const amountWordsValue = document.getElementById('tbAmountWords').value || numberToWords(grandTotalNum);
+
+    const selectedTourId = document.getElementById('tbTourSelect').value;
+    const selectedTour = cachedTours.find(t => t._id === selectedTourId);
+
+    const billData = {
+        billNo: document.getElementById('tbBillNo').value,
+        date: document.getElementById('tbDate').value,
+        customerName: document.getElementById('tbCustomerName').value,
+        contactNo: document.getElementById('tbContactNo').value,
+        customerEmail: email,
+        numberOfPersons: parseInt(document.getElementById('tbPersons').value),
+        address: document.getElementById('tbAddress').value,
+        tourId: selectedTourId || undefined,
+        tourName: selectedTour ? selectedTour.title : document.getElementById('tbDestination').value,
+        destination: document.getElementById('tbDestination').value,
+        duration: document.getElementById('tbDuration').value,
+        dateFrom: document.getElementById('tbDateFrom').value,
+        dateTo: document.getElementById('tbDateTo').value,
+        itinerary: collectTourBillItinerary(),
+        pricePerPerson: parseFloat(document.getElementById('tbPricePerPerson').value),
+        totalAmount: totalAmountNum,
+        amountWords: amountWordsValue,
+        advance: advanceNum,
+        balance: balanceNum,
+        extraCharges: extraChargesNum,
+        grandTotal: grandTotalNum,
+        routeDetails: document.getElementById('tbRouteDetails').value
+    };
+
+    try {
+        let response, billId = editingTourBillId;
+        if (editingTourBillId) {
+            response = await fetch(`${API_URL}/tour-bills/${editingTourBillId}`, {
+                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(billData)
+            });
+        } else {
+            response = await fetch(`${API_URL}/tour-bills`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(billData)
+            });
+            if (response.ok) { const saved = await response.json(); billId = saved._id; }
+        }
+        if (!response.ok) {
+            let msg = 'Failed to save'; try { const e = await response.json(); msg = e?.error || msg; } catch(_) {}
+            throw new Error(msg);
+        }
+        alert('Sending email... Please wait.');
+        const emailResp = await fetch(`${API_URL}/tour-bills/${billId}/send-email`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }
+        });
+        if (emailResp.ok) {
+            const result = await emailResp.json();
+            alert(`✅ ${result.message}`);
+            closeTourBillModal();
+            loadTourBills();
+        } else {
+            const error = await emailResp.json();
+            throw new Error(error.error || 'Failed to send email');
+        }
     } catch (error) {
         console.error('Error:', error);
         alert(`Error: ${error.message}`);
