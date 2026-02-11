@@ -1,9 +1,21 @@
 // Use centralized API base injected by api-base.js, fallback to localhost
 const API_URL = (typeof window !== 'undefined' && window.API_BASE) ? window.API_BASE : 'http://localhost:3000/api';
-const ADMIN_USERNAME = 'admin';
-const ADMIN_PASSWORD = 'admin123';
-const CLOUDINARY_CLOUD_NAME = 'dfw1w02tb';
-const CLOUDINARY_UPLOAD_PRESET = 'travel_unsigned';
+
+// Cloudinary config loaded from server
+let CLOUDINARY_CLOUD_NAME = '';
+let CLOUDINARY_UPLOAD_PRESET = '';
+
+// Load Cloudinary config from server on page load
+(async function loadConfig() {
+    try {
+        const resp = await fetch(`${API_URL}/admin/config`);
+        if (resp.ok) {
+            const cfg = await resp.json();
+            CLOUDINARY_CLOUD_NAME = cfg.cloudinaryCloudName;
+            CLOUDINARY_UPLOAD_PRESET = cfg.cloudinaryUploadPreset;
+        }
+    } catch (e) { console.error('Failed to load config:', e); }
+})();
 let allTours = [];
 let heroImageUrl = '';
 let galleryImagesUrls = [];
@@ -254,19 +266,31 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// Login
-document.getElementById('loginForm').addEventListener('submit', function(e) {
+// Login (server-side validation)
+document.getElementById('loginForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     const username = document.getElementById('adminUsername').value;
     const password = document.getElementById('adminPassword').value;
+    const error = document.getElementById('loginError');
     
-    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-        document.getElementById('loginScreen').classList.add('hidden');
-        document.getElementById('adminDashboard').classList.remove('hidden');
-        loadTours();
-    } else {
-        const error = document.getElementById('loginError');
-        error.textContent = 'Invalid username or password';
+    try {
+        const resp = await fetch(`${API_URL}/admin/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        const result = await resp.json();
+        if (resp.ok && result.success) {
+            error.classList.add('hidden');
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('adminDashboard').classList.remove('hidden');
+            loadTours();
+        } else {
+            error.textContent = result.error || 'Invalid username or password';
+            error.classList.remove('hidden');
+        }
+    } catch (err) {
+        error.textContent = 'Server error. Please try again.';
         error.classList.remove('hidden');
     }
 });
@@ -305,7 +329,7 @@ function showView(viewName) {
         'tours': 'Tours Management',
         'travells': 'Vehicle Rentals Management',
         'bookings': 'Booking Requests',
-        'bills': 'Bill Management',
+        'bills': 'Travell Bill Management',
         'tourBills': 'Tour Bill Management',
         'dates': 'Available Dates Management',
         'pricing': 'Tour Pricing Overview',
@@ -2252,13 +2276,15 @@ function sortBillsInPlace() {
             const aIsNum = Number.isFinite(an);
             const bIsNum = Number.isFinite(bn);
 
-            if (aIsNum && bIsNum && an !== bn) return an - bn;
+            // Newest first: higher billNo first
+            if (aIsNum && bIsNum && an !== bn) return bn - an;
             if (aIsNum && !bIsNum) return -1;
             if (!aIsNum && bIsNum) return 1;
 
             const ad = new Date(a.bill.date).getTime();
             const bd = new Date(b.bill.date).getTime();
-            if (Number.isFinite(ad) && Number.isFinite(bd) && ad !== bd) return ad - bd;
+            // Newest first: later date first
+            if (Number.isFinite(ad) && Number.isFinite(bd) && ad !== bd) return bd - ad;
             return a.originalIndex - b.originalIndex;
         })
         .map(x => x.bill);
